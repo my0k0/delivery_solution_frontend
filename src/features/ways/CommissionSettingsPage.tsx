@@ -10,7 +10,7 @@ import { fetchRiders, ridersKeys, updateRider } from '@/features/riders/api'
 import { RiderCommissionOverrideDialog } from '@/features/ways/RiderCommissionOverrideDialog'
 import { fetchCommissionRate, wayKeys, updateCommissionRate } from '@/features/ways/api'
 import { getApiErrorMessage } from '@/lib/api/client'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 
 export function CommissionSettingsPage() {
   const canOverrideCommission = usePermission('ways.override_commission')

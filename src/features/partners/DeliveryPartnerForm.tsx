@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { DeliveryPartner, DeliveryPartnerBody } from '@/features/orders/api'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 
 interface DeliveryPartnerFormProps {
   partner: DeliveryPartner | null

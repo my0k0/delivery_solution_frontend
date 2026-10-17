@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { wayKeys, type Way } from '@/features/ways/api'
 import { useQueryClient } from '@tanstack/react-query'

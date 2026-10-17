@@ -16,7 +16,7 @@ import {
   type UpdateOrderBody,
 } from '@/features/orders/api'
 import { calculateCodToCollect, calculateEstimatedDate, calculateNetOwedToShop } from '@/features/orders/money'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { useQuery } from '@tanstack/react-query'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'

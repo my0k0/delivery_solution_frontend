@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getApiErrorMessage } from '@/lib/api/client'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 import { fetchRiderBoard, orderKeys, submitRiderDelivered, type RiderBoardOrder } from '@/features/orders/api'
 
 function groupOrdersByWay(orders: RiderBoardOrder[]): Array<[string, RiderBoardOrder[]]> {

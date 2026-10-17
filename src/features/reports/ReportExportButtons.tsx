@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getApiErrorMessage } from '@/lib/api/client'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 import { downloadReportFile } from '@/features/reports/api'
 
 interface ReportExportButtonsProps {
