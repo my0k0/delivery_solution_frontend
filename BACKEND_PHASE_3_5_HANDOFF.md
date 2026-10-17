@@ -1,12 +1,12 @@
 # Backend Phase 3.5 — Frontend Implementation Handoff
 
-**Status:** Backend and frontend Phase 3.5 are implemented. The order-assignment revision (explicit staff-selected rider, township default fee, no rider township coverage, no rider-board filter/redaction) is implemented and this document reflects it. Keep this document as the frontend/API contract reference for future work.
+**Status:** HISTORICAL — SUPERSEDED by workflow v2. This is the Phase 3.5 handoff as it stood before workflow v2 shipped; keep it for historical context only. The current order lifecycle, endpoints, permission catalog, and shop/rider behavior are in `docs/delivery-workflow-v2.md` (see its **As built** section). Everything below describes the pre-v2 system and is out of date: order/delivery statuses are no longer `ASSIGNED | DELIVERED | FAILED`, the rider board no longer uses `deliveryAttemptId` or `GET /rider/board`, order creation no longer requires `GET /riders/assignable`, the rider route is `/rider-board` inside the office shell rather than `/rider`, townships do have a delete endpoint, and the permission catalog is 14 modules / 69 keys rather than 12 / 62.
 
 **Frontend repository:** Vite + React + TypeScript SPA. Follow the existing `CLAUDE.md` conventions. The frontend project instructions prohibit adding new test files.
 
 ## Start here
 
-1. If the backend API changes, start `../d_api` with `pnpm start:dev` and ensure migrations and seed grants are applied.
+1. If the backend API changes, start `../delivery_solution_api` with `pnpm start:dev` and ensure migrations and seed grants are applied.
 2. Regenerate the API contract with `pnpm codegen` after an API change. `src/types/api.ts` is generated and must not be hand-edited.
 3. Follow the implementation details below when maintaining or extending these flows.
 4. Run `pnpm lint`, `pnpm build`, and the existing tests; manually smoke against the backend. Do not add new test files in this repository.

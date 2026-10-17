@@ -4,18 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Vite + React (SPA) + TypeScript frontend for a single delivery company's operations backend (`d_api`, NestJS). Built: login, user management CRUD, roles CRUD, the role-permission grant grid, change-password, shops, riders, customers, township configuration, office order management/dashboard, and the RIDER delivery board. Sibling repos live in `../` (parent `delivery_solution/`): `d_api` (backend), `drizzle`. Nothing committed yet — only commit/push when the user explicitly asks.
+Vite + React (SPA) + TypeScript frontend for a single delivery company's operations backend (`delivery_solution_api`, NestJS). Built: login, user CRUD, role CRUD, the role-permission grant grid, change-password, shops, riders, customers, township configuration, delivery partners, ways and rider commission, office order management (create/edit/audit, assign, postpone, cancel, approval queue, send-back, partner mark-delivered), office and rider reports, and the shop portal. The backend lives in the sibling repo `../delivery_solution_api`; the order lifecycle and detailed API behavior are recorded in `docs/delivery-workflow-v2.md`. Work is committed on branch `feature/main_v2`; the standing rule is still to commit/push only when the user explicitly asks.
 
 **Locked decisions (user):**
 - **Vite + React SPA + TypeScript** — not Next.js (internal ops tool, pure JSON API, no SSR).
 - **Tailwind CSS + shadcn/ui** (copy-paste Radix-based components, light mode only in this pass).
 - **Design system:** black & white (monochrome) — near-black `--primary` / light-gray `--accent`, neutral whites/grays, gray focus ring. Fira Sans body / Fira Code numerals. Status colors (green/amber/red via `--success`/`--warning`/`--destructive`) are functional indicators for ACTIVE/INACTIVE + badges, not chrome. Dense, scannable ops-dashboard style (not landing-page style). **Colors come from CSS tokens in `src/index.css` ONLY — never hardcode hex or named color classes (`bg-blue-*`, `text-red-*`) in components.**
-- Deps to add (`src/`): `react-router-dom`, `@tanstack/react-query`, `zustand`, `axios`, `lucide-react`. Panel manager: `pnpm`, consistent with `d_api`.
+- Dependencies (`src/`): `react-router-dom`, `@tanstack/react-query`, `zustand`, `axios`, `lucide-react`. Package manager: `pnpm`, consistent with `delivery_solution_api`.
 
 ## Commands
 
 ```bash
-cd ../d_api && pnpm start:dev   # backend on :3000 (DB: docker compose up -d, seed: owner@mail.com + admin1/admin2@mail.com / Password1234)
+cd ../delivery_solution_api && pnpm start:dev   # backend on :3000 (DB: docker compose up -d, seed: owner@mail.com + admin1/admin2@mail.com / Password1234)
 pnpm dev                        # Vite dev server on :5173, proxies /api to backend
 pnpm build                      # tsc + vite build
 pnpm lint                       # ESLint
@@ -23,11 +23,11 @@ pnpm test                       # Vitest unit (**/*.spec.ts)
 pnpm test -- <path>             # single test file / filter
 ```
 
-**Do not write new tests in this repo** (standing user instruction). The pre-existing Vitest suite stays and must keep passing, but new work is gated by `pnpm lint` + `pnpm build` + manual smoke against `d_api`, never by a new spec file.
+**Do not write new tests in this repo** (standing user instruction). The pre-existing Vitest suite stays and must keep passing, but new work is gated by `pnpm lint` + `pnpm build` + manual smoke against `delivery_solution_api`, never by a new spec file.
 
-## API contract (from `d_api`, all `/api/v1`, Bearer JWT)
+## API contract (from `delivery_solution_api`, all `/api/v1`, Bearer JWT)
 
-Source of truth: **`GET /api/v1/docs-json`** — regenerate types with `pnpm codegen` (`openapi-typescript`, needs `d_api` running), never hand-wire shapes. Key shapes to be aware of:
+Source of truth: **`GET /api/v1/docs-json`** — regenerate types with `pnpm codegen` (`openapi-typescript`, needs `delivery_solution_api` running), never hand-wire shapes. Key shapes to be aware of:
 - `POST /auth/login` → `{ accessToken, user: UserResponseDto (id,name,email,phone,roleId,role,status,createdAt,updatedAt), permissions: string[] }`
 - `GET /auth/me` → `{ user, permissions }` (call on boot to restore/validate session); `POST /auth/change-password` → 204 (backend invalidates old tokens → frontend must force logout).
 - Users: `GET /users` (`search`,`roleId`,`status`,`page`,`perPage` → `{ data, meta }`), `POST /users`, `GET/PATCH/DELETE /users/:id` — gated `users.create/read/update/delete`.
@@ -35,24 +35,27 @@ Source of truth: **`GET /api/v1/docs-json`** — regenerate types with `pnpm cod
 - Permissions: `GET /permissions` (catalog grouped by `module`) gated `permissions.read`; `GET/PUT /permissions/roles/:roleId` (`PUT` body `{ permissions: string[] }`, replace-set) gated **`permissions.update`**. **The catalog is fixed and read-only from the frontend: `POST /permissions` and `DELETE /permissions/:name` are gone (404).**
 
 RBAC is **dynamic** (spatie-style: `roles`/`permissions`/`role_permissions` + `users.role_id`, OWNER/ADMIN manage everything from the UI). UI must mirror backend rules:
-- **The grid is fixed**: 12 modules / 62 keys across actions (`create, read, update, delete, export, import`). `view ≡ read`, `edit ≡ update`; the key is `{module}.{action}`, lowercase. `src/types/permission.ts` mirrors it as a typed union so a backend rename is a build error, not a silent 403. There is no `pickups` module or `deliveries.claim` permission; township endpoints use `orders.*`.
+- **The grid is fixed**: 14 modules / 69 keys. Modules: `users`, `roles`, `permissions`, `shops`, `customers`, `riders`, `orders`, `deliveries`, `townships`, `partners`, `ways`, `shop-portal`, `shop-reports`, `reports`. Actions are `create, read, update, delete, export, import`, plus the module-specific extras `orders.cancel`/`orders.update_costs`/`orders.update_after_approval`, `deliveries.approve`, and `ways.override_commission`. `view ≡ read`, `edit ≡ update`; the key is `{module}.{action}`, lowercase. `src/types/permission.ts` mirrors it as a typed union so a backend rename is a build error, not a silent 403. There is no `pickups` module or `deliveries.claim` permission. The `returns`, `payments`, and `notifications` modules were deleted, and townships and partners now have their own `townships.*` / `partners.*` keys.
 - `is_system` roles (OWNER): hold every permission, rows read-only/locked, zero grant rows — so read the grid from `isSystem`, **never** from `GET /permissions/roles/:roleId` (that returns empty for OWNER).
 - ADMIN: manages OFFICER/created roles only; OWNER + ADMIN rows read-only; can grant only keys ADMIN itself holds; own role read-only.
 - role `name` immutable after create (`PATCH /roles/:id` takes `{ description? }` only); delete-role blocked when `userCount > 0` (409 surfaces backend message).
 - Offer only catalog keys in the grid (`PUT` of unknown keys 404s). A module × action the catalog doesn't define renders as an inert `·` cell. `PUT` replaces the whole set, so keys no longer in the catalog are pruned on save.
 
-### Phase 3.5 operations flows
+### Workflow v2 operations flows
 
-- Contract details, exact rider-board fields, permissions, query parameters, and office/rider route behavior are recorded in `BACKEND_PHASE_3_5_HANDOFF.md`; use it alongside generated `src/types/api.ts`.
-- `src/features/townships/` owns office township list/create/edit/delete. Each township has a required `defaultDeliveryFee` (decimal string) shown in the list and prefilled into order entry, and a required integer `leadTimeDays` that drives the order's estimated delivery date. There is no `selectable` field or `selectable=true` query. Townships can be deleted (`DELETE /townships/{id}`, gated on `townships.delete`), except while orders still reference them — the API answers 409.
-- `src/features/riders/` owns rider administration and the assignable-rider list (`GET /riders/assignable`) used by order creation. Township and rider are independent — riders have no `townshipIds`; do not send or render township coverage. The flattened rider API's `id` is the account identity used for rider updates/deletion.
-- `src/features/orders/` owns office order creation/list/detail. Creation loads all townships via `GET /townships`, requires a township and an active rider chosen from `GET /riders/assignable`, prefills the editable delivery fee from the township's `defaultDeliveryFee`, and submits `townshipId`, `riderId`, and the fee shown. The rider list is the same for every township. Order editing and reassignment are out of scope; do not add an edit modal. Show the returned township and rider in office surfaces and surface API errors on submit.
-- Office order detail is organized into labeled sections for order/status, customer and shop, delivery, package/notes, and order history. Keep new office order detail surfaces consistent with that grouping.
-- `src/features/rider-board/` is a RIDER-only route at `/rider`, outside the office `AppShell`. The authenticated root/login redirect sends RIDER users there. Rider APIs self-scope from the JWT; do not authorize by query params or request office orders for rider views. RIDER must not receive `orders.read`.
-- Every rider-board row is the authenticated rider's own order with full details and a `deliveryAttemptId`; there is no `mine|all` filter (do not send `filter`) and no colleague redaction branch. `isMine` is deprecated and always `true` — do not rely on it. Send a calendar date string (`YYYY-MM-DD`) without UTC ISO slicing; metrics and rows share the selected assignment date. COD values remain decimal strings; display formatting must not change values used in calculations.
-- Only `status === 'ASSIGNED'` shows complete/fail actions. `deliveryAttemptId` is always present on rider-board rows.
-- Order/delivery statuses are `ASSIGNED | DELIVERED | FAILED`. No unassigned pool, claim/start action, pickup flow, `OUT_FOR_DELIVERY`, `STARTED`, or `RETURNED` order state. Shift/manifest, custody-return, and failure-threshold workflows are deferred.
-- The office dashboard is a separate, read-only `/dashboard` surface gated by `reports.read`. The backend permits OWNER/ADMIN/OFFICER and denies RIDER. Follow `PLAN.md` and `../d_api/PLAN.md` (“Office dashboard — first slice COMPLETE”); do not reuse rider dashboard APIs for office totals, and do not present status-derived COD sums as cash collected/reconciled or invent on-time/custody metrics.
+The authoritative spec is `docs/delivery-workflow-v2.md` (synced from the API repo, including its **As built** section); use it alongside generated `src/types/api.ts`. `BACKEND_PHASE_3_5_HANDOFF.md` is the historical Phase 3.5 handoff and is superseded.
+
+- **Order lifecycle:** `PENDING → ASSIGNED → AWAITING_APPROVAL → DELIVERED`, with a single terminal `CANCELLED`. Clearing the assignee or postponing returns an order to `PENDING`; `CANCELLED` covers both a called-off delivery and a package that came back to the shop (the former `RETURNED` state was merged into it). All transitions go through the API's order-state service and are written to order history.
+- **Order actions:** create (`POST /orders`), audited edit (`PATCH /orders/:id`, `GET /orders/:id/audit`), assign, postpone, cancel, approve, send-back, and partner mark-delivered. Riders submit delivered via `POST /riders/me/orders/:id/delivered`; officers work the approval queue at `/orders/approval`.
+- `src/features/townships/` owns township list/create/edit/delete, gated by `townships.*`. Each township has a required `defaultDeliveryFee` (decimal string) and a required integer `leadTimeDays`, plus an optional default assignee (rider or partner). There is no `selectable` field. A township can be deleted except while orders still reference it — the API answers 409.
+- `src/features/partners/` owns delivery-partner administration (`partners.*`; the API path is `/delivery-partners`). Partner orders never have a way or rider commission and are marked delivered by an officer directly.
+- `src/features/riders/` owns rider administration and the rider pages: `RiderBoardPage` (`/rider-board`) and `RiderDashboardPage` (`/rider-dashboard`). Riders have no `townshipIds` — township and rider are independent; do not send or render township coverage. A township's default assignee does not constrain the rider list.
+- `src/features/ways/` owns ways and rider commission: per-way rate (default 500 MMK, configurable, with an optional rider override), moving orders between ways, and the `ways.override_commission` pay-anyway flow.
+- Office order detail groups order/status, customer and shop, delivery, package/notes, and history into labeled sections; keep new detail surfaces consistent with that grouping.
+- **Rider boundary:** the rider routes are RIDER-only and now sit inside the office `AppShell`. Rider APIs self-scope from the JWT; do not authorize by query params or request office orders for rider views. RIDER must not receive `orders.read`. Riders see only their own orders — there is no `mine|all` filter, colleague redaction, or `deliveryAttemptId` (delivery attempts were retired in v2).
+- Send calendar dates as `YYYY-MM-DD` without UTC ISO slicing; money values (COD, fees, partner cost, commission) stay decimal strings, and display formatting must not change the values used in calculations.
+- `src/features/shop-portal/` owns the shop surface at `/shop/*`. Shop scope comes from the authenticated user's `shopId` server-side; shop DTOs exclude rider/partner identity, partner cost, internal notes, and audit fields.
+- Reports live under `src/features/reports/` (`/dashboard`, `/reports/orders`, `/reports/shop-statement`, `/reports/rider-collection`, `/reports/rider-payout`), all gated by `reports.read`. Do not reuse rider dashboard APIs for office totals, and do not present status-derived COD sums as cash collected/reconciled or invent on-time/custody metrics. Phase 6 (payment ledger, reconciliation, shop prepayments) remains blocked.
 
 ## Architecture (planned layout)
 
@@ -60,7 +63,7 @@ RBAC is **dynamic** (spatie-style: `roles`/`permissions`/`role_permissions` + `u
 - `src/lib/store/` (zustand) — auth store: `token`, `user`, `permissions`, `setSession`, `clearSession`, `hasPermission(key: PermissionKey)`; token persisted in `localStorage`. `permissions` stays `string[]` (server data); `PermissionKey` is assignable to it.
 - `usePermission` hook + `<ProtectedRoute perm="users.read">`: route-level gate → 403 page; button/link-level gate hides element. Both take a `PermissionKey`, so a stale key fails to compile. Mirrors backend grants so UI hides what the API would 403.
 - `src/components/layout/AppShell` — sidebar (desktop ≥1024px, mobile collapsible drawer), topbar with role badge + dropdown (Change Password / Logout), `<Outlet/>`.
-- `src/features/auth|users|roles|permissions|settings|shops|riders|customers|townships|orders|dashboard|rider-board/` — one folder per domain, each owning its **`api.ts`** (query-key factory + fetch fns + `use*` hooks), **`validations.ts`** (zod schemas + inferred `*Values` types), optional **`mappers.ts`** (pure DTO↔form-state translation), and its pages/dialogs/forms. Cross-feature access is a **direct feature→feature import** (`features/users/api.ts` imports `rolesKeys` from `@/features/roles/api`) — no `lib/` indirection layer. Example: `features/settings/ChangePasswordPage.tsx` imports from `@/features/auth/api` + `@/features/auth/validations`.
+- `src/features/auth|users|roles|permissions|settings|shops|riders|customers|townships|partners|orders|ways|reports|shop-portal|errors/` — one folder per domain, each owning its **`api.ts`** (query-key factory + fetch fns + `use*` hooks), **`validations.ts`** (zod schemas + inferred `*Values` types), optional **`mappers.ts`** (pure DTO↔form-state translation), and its pages/dialogs/forms. The rider board (`/rider-board`) and rider dashboard (`/rider-dashboard`) pages live in `features/riders/`. Cross-feature access is a **direct feature→feature import** (`features/users/api.ts` imports `rolesKeys` from `@/features/roles/api`) — no `lib/` indirection layer. Example: `features/settings/ChangePasswordPage.tsx` imports from `@/features/auth/api` + `@/features/auth/validations`.
 - `src/config/` — app-level static config (e.g. `src/config/navigation.ts` — sidebar `NAV_ITEMS` + `firstAllowedPath`). NOT in `lib/`.
 - `src/types/` — `api.ts` (codegen, read-only) + `permission.ts` (hand-written mirror of the backend's `permission-keys.ts`: `MODULE_ACTIONS`, `PermissionKey`, `ACTION_ORDER`). The catalog is fixed, so keys autocomplete at compile time; which cells *exist* still comes from the API response.
 - `src/components/ui/` — shadcn components: `button`, `input`, `label`, `card`, `dialog`, `table`, `dropdown-menu`, `badge`, `select`, `alert-dialog`, `sonner`, `skeleton`, `pagination`, `checkbox`.
@@ -121,11 +124,11 @@ Layering: `ui-ux-pro-max` (usability/structure) → `taste` (visual polish) — 
 - React Query keyed on filter state (search/role/status/page) with refetch-on-mutation; pagination control wired to `meta`.
 - Create-dialog role Select must be restricted per the same hierarchy rule that restricts ADMIN (hide OWNER/ADMIN for ADMIN callers).
 - Keep contrast ≥4.5:1; focus rings visible; 375px viewport must not scroll horizontally. Defer dark mode.
-- Correctness bar: `pnpm lint` zero errors and `pnpm build` (tsc) green before calling work done, plus a manual smoke pass against `d_api`. No new spec files — see Tests above.
+- Correctness bar: `pnpm lint` zero errors and `pnpm build` (tsc) green before calling work done, plus a manual smoke pass against `delivery_solution_api`. No new spec files — see Tests above.
 
 ### Types & Codegen (do right after scaffold)
 
-- DevDep `openapi-typescript`; script `"codegen": "openapi-typescript http://localhost:3000/api/v1/docs-json -o src/types/api.ts"` (`d_api` must be running). Commit the generated `src/types/api.ts` — it is the **source of truth** for all request/response types.
+- DevDep `openapi-typescript`; script `"codegen": "openapi-typescript http://localhost:3000/api/v1/docs-json -o src/types/api.ts"` (`delivery_solution_api` must be running). Commit the generated `src/types/api.ts` — it is the **source of truth** for all request/response types.
 - Keep hand-written types in a separate file (not in `api.ts`) so codegen never clobbers them.
 
 ### shadcn / Base UI (base-nova) — gotchas

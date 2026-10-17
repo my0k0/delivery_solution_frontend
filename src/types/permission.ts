@@ -1,6 +1,6 @@
 /**
  * Hand-written mirror of the backend's fixed permission grid
- * (`d_api/src/common/auth/permission-keys.ts`). Kept out of `api.ts` so codegen
+ * (`delivery_solution_api/src/common/auth/permission-keys.ts`). Kept out of `api.ts` so codegen
  * never clobbers it.
  *
  * This is a *type* mirror, not a runtime source of truth: which keys actually

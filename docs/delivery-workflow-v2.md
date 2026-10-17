@@ -1,6 +1,6 @@
 # Delivery Workflow v2 — Approved Requirement Change
 
-**Status:** APPROVED PLAN, NOT YET IMPLEMENTED. This document is authoritative and supersedes any conflicting text in `README.md`, `PLAN.md`, `AGENTS.md`, `CLAUDE.md` (both repos) about the order lifecycle, pickups, delivery attempts, the 3-attempt cap, and Phase 6 scope boundaries. Implement phase by phase (A → F). Stop for human review at the end of each phase. Commit only when the user asks.
+**Status:** IMPLEMENTED (phases A–E complete; Phase F documentation updated).
 
 Repos: `delivery_solution_api` (NestJS 12, Drizzle, Postgres 18) and `delivery_solution_frontend` (Vite + React + TS). Follow each repo's `CLAUDE.md`: no `any`, no abbreviations, ESM `.js` import suffixes, kebab-case typed file names, DTOs for all request/response shapes with `@Api*Response({ type })`, one responsibility per dialog/form file on the frontend, `pnpm codegen` for frontend API types (API must be running), **no new test files in the frontend**.
 
@@ -83,6 +83,8 @@ Decimal strings / SQL `numeric`, never JS floats. P = `packagePrice`, F = `deliv
 
 New/changed keys: `deliveries.approve`, `orders.cancel`, `orders.update_costs`, `orders.update_after_approval`, `shop-portal.read`, `shop-reports.export`, `ways.override_commission`; add modules `townships`, `partners`, `ways` as needed; remove `pickups.*`. Riders must still not receive `orders.read`. The SHOP role gets only `shop-portal.read` and `shop-reports.export`. Update OFFICER/RIDER/SHOP seed mappings.
 
+As built, the catalog is **14 modules / 69 keys**. The `returns`, `payments`, and `notifications` modules were later removed entirely, so the catalog no longer reserves keys for unimplemented areas.
+
 ## 7. APIs
 
 - Office: `POST /orders` (`riderId` set = manual, `null` = pending, omitted = township default; a township without assignee does not block creation), `PATCH /orders/:id` (audited edit; changing township asks the client to confirm before overwriting fee/assignee defaults), `POST /orders/:id/cancel`, `/orders/:id/assign`, `/orders/:id/postpone`, `/orders/:id/approve`, `/orders/:id/send-back`, `/orders/:id/mark-delivered` (partner), `GET /orders/:id/audit`, townships/partners CRUD, ways list/move/start/pay-anyway, settings.
@@ -108,3 +110,50 @@ Gate after every phase — API: `pnpm lint`, `pnpm build`, `pnpm test`, `pnpm te
 - Race conditions: ways auto-join (partial unique index + upsert), state transitions (guarded by expected current status, as in `applyTransitionInTransaction`).
 - Privacy: shop endpoints must be scoped by `users.shop_id` server-side, never by client-supplied shop id.
 - Out of scope: Phase 6 ledger/reconciliation, prepayments to shops, partial customer payments, notifications.
+
+## As built
+
+The following paths are under `/api/v1`.
+
+### Implemented endpoints
+
+- **Office orders:** `GET/POST /orders`; `GET /orders/:id`; `PATCH /orders/:id`; `GET /orders/:id/history`; `GET /orders/:id/audit`; `POST /orders/:id/assign`; `POST /orders/:id/postpone`; `POST /orders/:id/cancel`; `POST /orders/:id/approve`; `POST /orders/:id/send-back`; `POST /orders/:id/mark-delivered` (partner orders).
+- **Reference data:** township CRUD at `/townships`; delivery-partner CRUD at `/delivery-partners` (permission namespace `partners`).
+- **Ways and commission:** `GET/POST /ways`; `GET /ways/:id`; `POST /ways/:id/close`; `POST /ways/:id/move-orders`; `POST /ways/:id/pay-anyway`; `GET/PUT /ways/settings/commission-per-way`.
+- **Rider:** `GET /riders/me/orders`; `POST /riders/me/orders/:id/delivered`; `GET /riders/me/dashboard`.
+- **Reports:** `GET /reports/orders` and `/reports/orders/export`; `/reports/shop-statement` and `/reports/shop-statement/export`; `/reports/rider-collection` and `/reports/rider-collection/export`; `/reports/rider-payout` and `/reports/rider-payout/export`; `GET /reports/office-dashboard`.
+- **Shop portal:** `GET /shop/orders`; `GET /shop/orders/export`; `GET /shop/orders/:id`; `GET /shop/dashboard`; `GET /shop/statement`; `GET /shop/statement/export`.
+
+Exports accept CSV or XLSX and use the shared spreadsheet formula-injection guard. The API contract and DTO shapes are generated from the running API's OpenAPI document.
+
+### Shop display and attention behavior
+
+The shop portal uses dedicated shop response DTOs and derives the shop scope only from the authenticated user's `shopId`. It never returns rider/partner identity, partner cost, internal notes, or audit fields.
+
+Internal order states map to shop display states as follows: `PENDING` → `RECEIVED`; `ASSIGNED` and `AWAITING_APPROVAL` → `OUT_FOR_DELIVERY`; `DELIVERED` → `DELIVERED`; `CANCELLED` → `CANCELLED`.
+
+An order needs attention if it is still open (`PENDING`, `ASSIGNED`, or `AWAITING_APPROVAL`) and either its estimated delivery date is before today in `APP_TIMEZONE` or the latest postponement/send-back history entry has a non-empty reason. Closed delivered/cancelled orders do not receive the open-order attention flag.
+
+### Settings and report definitions
+
+The commission setting is `GET/PUT /api/v1/ways/settings/commission-per-way`, backed by `app_settings.key = 'commissionPerWay'`; the base seed inserts 500.00. Rider override is optional and a way snapshots the selected rate when created.
+
+- **Date basis:** office order reports, shop statements, and shop portal date filters default to `ENTRY` (`orders.createdAt`); `DELIVERED` uses `orders.deliveredAt`. Date filters/grouping in these reporting paths use `APP_TIMEZONE`. Shop filters default to the current local date. Rider payout is grouped by `ways.wayDate`.
+- **Shop received count:** an internal `PENDING` order is displayed as `RECEIVED`. `ASSIGNED` and `AWAITING_APPROVAL` are displayed as `OUT_FOR_DELIVERY`.
+- **COD collected:** only `DELIVERED` orders count as collected. **COD expected:** only open `PENDING`, `ASSIGNED`, and `AWAITING_APPROVAL` orders count as expected. COD/net-owed projections and office/shop statement payable totals exclude cancelled orders; shop order-list package-price, delivery-fee, and combined totals exclude `CANCELLED` orders. COD and net owed are calculated from package price, delivery fee, and the two payment-to-shop flags.
+- **Rider collection:** rows are grouped by the local date of `deliveredAt` and include `DELIVERED` and `AWAITING_APPROVAL` orders. Approved-delivery COD is `expectedCodToHandBack`; awaiting-approval COD is reported separately.
+- **Rider payout:** ways are grouped by `wayDate`; a way is `EARNED` when at least one linked order is `DELIVERED`, `PENDING_APPROVAL` when it has orders but none delivered, `PAID_ANYWAY` when overridden, and `EMPTY` when it has no orders. Override amounts are shown separately.
+- **Other implemented reports:** the office dashboard provides order/status and finance series, shop ranking and township success rates; the shop dashboard provides local-date status counts and derived settlement summaries; the rider dashboard provides way counts, earned/pending commission, and today's delivered COD.
+
+### Differences from this document's planned behavior
+
+The implementation is authoritative where it differs from the plan:
+
+1. The delivery-partner CRUD URL is `/delivery-partners`, while its permission module is `partners`.
+2. Default role access is seeded in `scripts/seed.ts`. Role boundaries are grant-based, not enforced by hard-coded role-name checks: for example, postpone uses `orders.update`, and pay-anyway/settings use `ways.override_commission`. OWNER and ADMIN have those grants by default, but ADMIN can grant catalog permissions to other roles; these operations are not intrinsically restricted to named roles.
+3. The base `orders.codAmount` column remains in the schema, but application code does not read it; COD and net owed are derived from the order fields and flags.
+4. `rider-collection` accepts the shared date-range DTO, including `dateBasis`, but the service always filters/groups by `deliveredAt`. `rider-payout` uses `ways.wayDate` rather than an order date basis.
+5. Some non-report order date handling is not yet aligned with the documented timezone convention: order-list `dateFrom`/`dateTo` bounds are built as UTC timestamps, and the default estimated delivery date starts from the current UTC calendar date. Report and shop portal date boundaries use `APP_TIMEZONE`.
+6. The proposed standalone `/reports/daily`, `/reports/cod-pending`, `/reports/rider-performance`, and `/reports/shop-performance` endpoints are not present. The live report set is the endpoint list above.
+7. Ways also have an `EMPTY` derived state when they contain no orders; the planned state summary listed pending approval, earned, and paid anyway.
+8. `drizzle/0018_merge-cancel-return.sql` is a data-mapping migration. Decision 21 assumed dev data was disposable and that no status mapping would be needed, but `RETURNED` was later folded into the single terminal `CANCELLED` state, so the migration rewrites existing `RETURNED` rows in `orders.status` and in `order_status_history.from_status`/`to_status` before rebuilding the `order_status` enum type. `RETURNED` no longer exists in the enum, the transition matrix, the shop display vocabulary, or the report DTOs; `returnedCount` was removed from the shop statement rather than kept as an always-zero column.

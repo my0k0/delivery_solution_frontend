@@ -1,21 +1,23 @@
 # Delivery Solution — Frontend
 
-Vite + React + TypeScript operations SPA for the Delivery Solution API (`../d_api`, NestJS). Uses React Router, TanStack Query, Zustand, Axios, Tailwind CSS, and the project’s shadcn-style UI components.
+Vite + React + TypeScript operations SPA for the Delivery Solution API (`../delivery_solution_api`, NestJS). Uses React Router, TanStack Query, Zustand, Axios, Tailwind CSS, and the project’s shadcn-style UI components.
 
 ## Features
 
 - Authentication, user and role management, and role-permission grants.
-- Shop, customer, and rider administration.
-- Township management with a default delivery fee.
-- Office order creation with an explicit active-rider selector and per-order delivery fee override, plus order list and details/history.
-- Rider-only delivery board with assignment-date dashboard and own assigned delivery completion/failure actions.
+- Shop, customer, rider, township, and delivery-partner administration.
+- Ways and rider commission: per-way rate, optional rider override, pay-anyway override.
+- Office order management: creation with a township default assignee or an explicit rider/partner, audited editing, assignment, postponement, cancel, the approval queue, send-back, and partner mark-delivered.
+- Office and rider reports: order report, shop statement, rider collection, rider payout, and the office dashboard, with CSV/XLSX export.
+- Rider surface: own-order delivery board and an assignment-date dashboard.
+- Shop portal: shop-scoped order list, order detail, dashboard, and statement exports.
 
 ## Local development
 
 Start the backend in one terminal:
 
 ```bash
-cd ../d_api && pnpm start:dev  # backend at http://localhost:3000
+cd ../delivery_solution_api && pnpm start:dev  # backend at http://localhost:3000
 ```
 
 Then run the frontend and checks from this repository in another terminal:
@@ -27,7 +29,7 @@ pnpm build
 pnpm test
 ```
 
-The Vite server proxies `/api` to the backend. Seed credentials and database setup are documented in `../d_api/README.md` and the project instructions in `CLAUDE.md`.
+The Vite server proxies `/api` to the backend. Seed credentials and database setup are documented in `../delivery_solution_api/README.md` and the project instructions in `CLAUDE.md`.
 
 ## Contract types
 
@@ -37,16 +39,18 @@ The Vite server proxies `/api` to the backend. Seed credentials and database set
 pnpm codegen
 ```
 
-`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 12 modules / 62 keys; township endpoints use `orders.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
+`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 14 modules / 69 keys; townships and delivery partners have their own `townships.*` / `partners.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
 
-## Phase 3.5 behavior
+## Order workflow
 
-- Office staff register an order after the package arrives at the office. Creation requires a township, an active rider chosen from `GET /riders/assignable`, and shop/customer. Township and rider are independent: the rider list is the same for every township.
-- Each township carries a `defaultDeliveryFee`. Selecting a township prefills the order’s editable fee, and staff can override it for that order.
-- Townships and riders are not linked. Rider administration no longer manages township coverage.
-- Rider users are directed to `/rider`, outside the office `AppShell`. The board uses `YYYY-MM-DD` in the office timezone and defaults to `Asia/Yangon`.
-- Every rider-board row is the authenticated rider’s own order with full delivery/customer details and a delivery-attempt id; there is no colleague-order redaction or `mine`/`all` filter.
-- Valid order and delivery states are `ASSIGNED`, `DELIVERED`, and `FAILED`. There is no claim/start action or pickup, return, or shift workflow in this phase.
+- Office staff register an order after the package arrives at the office. Creation requires a township and a shop/customer, and takes an assignee: an explicit rider or delivery partner, or the township default. A township with no default assignee leaves the order `PENDING`.
+- Each township carries a `defaultDeliveryFee` and a `leadTimeDays`. Selecting a township prefills the order’s editable fee (overridable per order) and the estimated delivery date.
+- Townships and riders are independent; riders have no township coverage. A township may name a default assignee, and one rider can cover many townships.
+- Order edits are audited field-by-field. Cost changes require `orders.update_costs`; cost changes after delivery approval also require `orders.update_after_approval` and a reason.
+- Riders submit an assigned order as delivered (`AWAITING_APPROVAL`); an officer approves it or sends it back. Partner orders are marked delivered by an officer directly.
+- Riders are routed to `/rider-board` (with `/rider-dashboard`) inside the office shell and see only their own orders. The board uses `YYYY-MM-DD` in the office timezone and defaults to `Asia/Yangon`.
+- Order states are `PENDING`, `ASSIGNED`, `AWAITING_APPROVAL`, `DELIVERED`, and `CANCELLED`. Clearing the assignee returns an order to `PENDING`; `CANCELLED` is the single terminal state, which now also covers a package that came back to the shop. There is no claim/start action, pickup flow, or shift/custody workflow.
+- The shop portal serves `/shop/*` with dedicated shop DTOs that exclude rider/partner identity, partner cost, internal notes, and audit data.
 
 ## Project conventions
 

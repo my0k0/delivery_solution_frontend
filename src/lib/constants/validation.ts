@@ -27,7 +27,7 @@ export const COMMISSION_MAX_LENGTH = 13
 /**
  * Length limits the API enforces (`@MaxLength` on the request DTOs).
  *
- * These mirror `d_api`, not the UI: a value longer than the server's limit is a
+ * These mirror `delivery_solution_api`, not the UI: a value longer than the server's limit is a
  * 400 after the user has typed the whole thing, so the client has to stop it
  * first. They used to be magic numbers inside each feature's zod schema, which
  * is how they drifted — `shops.channelName` allowed 200 against a DTO limit of
