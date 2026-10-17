@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
-import { fetchRiders } from '@/features/riders/api'
+import { useAssignableRiders } from '@/features/riders/api'
 import { fetchDeliveryPartners, type Order } from '@/features/orders/api'
-import { usePermission } from '@/lib/auth/gate'
+import { usePermission } from '@/lib/auth/usePermission'
 
 interface AssignOrderDialogProps {
   order: Order | null
@@ -16,12 +16,13 @@ interface AssignOrderDialogProps {
 
 export function AssignOrderDialog({ order, pending, onClose, onSave }: AssignOrderDialogProps) {
   const canUpdateOrder = usePermission('orders.update')
-  const riders = useQuery({ queryKey: ['operations', 'riders', 'active'], queryFn: () => fetchRiders({ page: 1, perPage: 100, status: 'ACTIVE' }) })
+  // Dedicated endpoint: only riders the office may actually assign to.
+  const riders = useAssignableRiders()
   const partners = useQuery({ queryKey: ['workflow-partners'], queryFn: fetchDeliveryPartners })
   const [assigneeType, setAssigneeType] = useState<'RIDER' | 'PARTNER' | ''>('')
   const [assigneeId, setAssigneeId] = useState('')
   const [message, setMessage] = useState('')
-  const riderOptions = (riders.data?.data ?? []).map((rider) => ({ value: rider.id, label: rider.name }))
+  const riderOptions = (riders.data ?? []).map((rider) => ({ value: rider.id, label: rider.name }))
   const partnerOptions = (partners.data ?? []).filter((partner) => partner.isActive).map((partner) => ({ value: partner.id, label: partner.name }))
 
   async function submit() {
