@@ -39,8 +39,11 @@ export function TownshipDialog({ open, township, onClose }: TownshipDialogProps)
     try {
       await saveTownshipMutation.mutateAsync({
         id: township?.id,
-        name: values.name,
-        defaultDeliveryFee: values.defaultDeliveryFee,
+        body: {
+          name: values.name,
+          defaultDeliveryFee: values.defaultDeliveryFee,
+          leadTimeDays: Number(values.leadTimeDays),
+        },
       })
       toast.success(isEditing ? 'Township updated' : 'Township created')
       handleClose()
@@ -57,8 +60,8 @@ export function TownshipDialog({ open, township, onClose }: TownshipDialogProps)
             <DialogTitle>{isEditing ? 'Edit township' : 'New township'}</DialogTitle>
             <DialogDescription>
               {isEditing
-                ? 'Update the township name and its default delivery fee.'
-                : 'Create a delivery area and set its default delivery fee.'}
+                ? 'Update the township name, its default delivery fee and lead time.'
+                : 'Create a delivery area and set its default delivery fee and lead time.'}
             </DialogDescription>
           </DialogHeader>
 
