@@ -15,10 +15,10 @@ Real voucher patterns: price + fee to collect (47,000 + 3,500 = 50,500); "COD 18
 1. **Shop portal:** shop users log in (`users.shop_id`, one login per shop, one shop per user) and see only their own orders. Filters: date range (default today) with a **date basis selector** (entry date default, or delivered date), status, datetime. Search by customer name, phone, etc. Columns: package price, delivery fee, total, status, delivered datetime, estimated date.
 2. **Delivered datetime** = when the rider taps delivered (not approval time). For partner orders it is the officer's mark-delivered time.
 3. **Approval:** rider marks delivered → status `AWAITING_APPROVAL` → officer approves (`DELIVERED`) or **Send back** (returns to `ASSIGNED`, shop-visible reason + internal note). Approval keys belong to the officer role.
-4. **Cancel** = order is dead (`CANCELLED`); anyone with `orders.cancel` (order-create role) can cancel. Send back = approval rejection.
+4. **Cancel** = order is dead (`CANCELLED`), whether the delivery was called off or the package came back to the shop — one terminal state, no separate returned state. Anyone with `orders.cancel` (order-create role) can cancel. Send back = approval rejection.
 5. **Rider** has only "submit delivered". No reject/fail button.
 6. **Failure/postponement:** only an officer decides, with a reason visible to the shop. Order may be re-assigned to the same rider, another rider, or nobody (goes to `PENDING`).
-7. **Statuses:** `PENDING` (no assignee), `ASSIGNED`, `AWAITING_APPROVAL`, `DELIVERED`, `RETURNED` (officer-only terminal, goods back to shop, reason required, from `PENDING`/`ASSIGNED`), `CANCELLED`. Clearing the assignee returns to `PENDING`. All state changes are kept in history.
+7. **Statuses:** `PENDING` (no assignee), `ASSIGNED`, `AWAITING_APPROVAL`, `DELIVERED`, `CANCELLED`. Clearing the assignee returns to `PENDING`. All state changes are kept in history.
 8. **Editable order:** all fields (township, shop, customer, address, notes, price, delivery fee, assignee including blank, etc.), every edit audited field-by-field.
 9. **No round-robin.** One default rider-or-partner per township; one rider may cover many townships. Order create prefills the township default assignee; manual override allowed.
 10. **Township** has `defaultDeliveryFee` (prefilled, overridable) and `leadTimeDays`.
@@ -53,10 +53,10 @@ Extend `users`: nullable `shopId` FK. New seeded role `SHOP`.
 State machine (`OrderStateService`, hard-coded matrix, exhaustive unit tests):
 
 ```
-PENDING            → ASSIGNED, CANCELLED, RETURNED
-ASSIGNED           → PENDING (clear assignee / postpone), ASSIGNED (re-assign, history row), AWAITING_APPROVAL, CANCELLED, RETURNED
+PENDING            → ASSIGNED, CANCELLED
+ASSIGNED           → PENDING (clear assignee / postpone), ASSIGNED (re-assign, history row), AWAITING_APPROVAL, CANCELLED
 AWAITING_APPROVAL  → DELIVERED (approve), ASSIGNED (send back)
-DELIVERED, RETURNED, CANCELLED → terminal
+DELIVERED, CANCELLED → terminal
 ```
 
 Partner orders: officer marks delivered directly `ASSIGNED → DELIVERED` (acts as approval, sets `deliveredAt`). Partner orders have no way and no commission.
@@ -85,7 +85,7 @@ New/changed keys: `deliveries.approve`, `orders.cancel`, `orders.update_costs`, 
 
 ## 7. APIs
 
-- Office: `POST /orders` (`riderId` set = manual, `null` = pending, omitted = township default; a township without assignee does not block creation), `PATCH /orders/:id` (audited edit; changing township asks the client to confirm before overwriting fee/assignee defaults), `POST /orders/:id/cancel`, `/orders/:id/assign`, `/orders/:id/postpone`, `/orders/:id/return`, `/orders/:id/approve`, `/orders/:id/send-back`, `/orders/:id/mark-delivered` (partner), `GET /orders/:id/audit`, townships/partners CRUD, ways list/move/start/pay-anyway, settings.
+- Office: `POST /orders` (`riderId` set = manual, `null` = pending, omitted = township default; a township without assignee does not block creation), `PATCH /orders/:id` (audited edit; changing township asks the client to confirm before overwriting fee/assignee defaults), `POST /orders/:id/cancel`, `/orders/:id/assign`, `/orders/:id/postpone`, `/orders/:id/approve`, `/orders/:id/send-back`, `/orders/:id/mark-delivered` (partner), `GET /orders/:id/audit`, townships/partners CRUD, ways list/move/start/pay-anyway, settings.
 - Rider: board of own assigned orders (computed COD, 0 for fully prepaid), `POST /riders/me/orders/:id/delivered`. No fee/margin/partner/shop finance fields.
 - Shop: `GET /shop/orders`, `GET /shop/orders/:id`, `GET /shop/dashboard`, `GET /shop/statement` (+CSV/XLSX export). **Dedicated `ShopOrderResponseDto`**: no rider, partner, cost, internal-note or audit fields; shop-relevant history only; `AWAITING_APPROVAL` is mapped to "Out for delivery" in the DTO builder. Never hide fields conditionally on a shared DTO.
 - Reports (read-only, derived): shop statement, order report (filters: date, shop, township, status, assignee; totals row; CSV), rider collection (per rider per day, expected COD to hand back), rider payout (ways × rate, pending vs earned, override flagged), office dashboard, shop dashboard, rider dashboard.
@@ -93,7 +93,7 @@ New/changed keys: `deliveries.approve`, `orders.cancel`, `orders.update_costs`, 
 ## 8. Phases (stop for review after each)
 
 - **A — Schema, state machine, permissions (API):** remove pickups + delivery attempts, new tables/columns, new matrix + unit tests, permission catalog + seed + SHOP role, `users.shop_id`, `pnpm db:reset`, full gate.
-- **B — Office orders + approval:** order create/edit/audit/cancel/assign/postpone/return/approve/send-back API; frontend order form (township prefill, overwrite prompt), approval queue, audit view, townships/partners screens; `pnpm codegen`.
+- **B — Office orders + approval:** order create/edit/audit/cancel/assign/postpone/approve/send-back API; frontend order form (township prefill, overwrite prompt), approval queue, audit view, townships/partners screens; `pnpm codegen`.
 - **C — Ways + commission:** ways table logic, settings, rider board "submit delivered", pay anyway.
 - **D — Reports + dashboards:** endpoints, CSV/XLSX export, office/rider dashboards (`dataviz` skill before the first chart).
 - **E — Shop portal:** shop endpoints + dedicated DTO, separate frontend route tree/layout, shop dashboard and exports.

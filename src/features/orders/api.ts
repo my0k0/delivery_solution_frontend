@@ -10,7 +10,6 @@ export const ORDER_STATUSES = [
   'ASSIGNED',
   'AWAITING_APPROVAL',
   'DELIVERED',
-  'RETURNED',
   'CANCELLED',
 ] as const satisfies readonly OrderStatus[]
 
@@ -171,10 +170,6 @@ export async function postponeOrder(orderId: string, body: OrderReason): Promise
 
 export async function cancelOrder(orderId: string, body: OrderReason): Promise<Order> {
   return (await http.post<Order>(`/orders/${orderId}/cancel`, body)).data
-}
-
-export async function returnOrder(orderId: string, body: OrderReason): Promise<Order> {
-  return (await http.post<Order>(`/orders/${orderId}/return`, body)).data
 }
 
 export async function approveOrder(orderId: string): Promise<Order> {

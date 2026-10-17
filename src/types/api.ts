@@ -440,22 +440,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/orders/{id}/return": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["OrdersController_returnOrder_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/orders/{id}/approve": {
         parameters: {
             query?: never;
@@ -1268,7 +1252,7 @@ export interface components {
             wayLabel: Record<string, never> | null;
         };
         /** @enum {string} */
-        OrderStatus: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+        OrderStatus: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
         RiderDeliveredResponseDto: {
             id: string;
             status: components["schemas"]["OrderStatus"];
@@ -1627,7 +1611,7 @@ export interface components {
             id: string;
             trackingCode: string;
             /** @enum {string} */
-            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
             /** Format: uuid */
             wayId: Record<string, never> | null;
             /** Format: uuid */
@@ -1753,7 +1737,7 @@ export interface components {
             townshipId?: Record<string, never> | null;
             townshipName?: Record<string, never> | null;
             /** @enum {string} */
-            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
             /** @enum {string|null} */
             assigneeType?: "RIDER" | "PARTNER" | null;
             assigneeId?: Record<string, never> | null;
@@ -1793,7 +1777,6 @@ export interface components {
             receivedCount: number;
             outForDeliveryCount: number;
             deliveredCount: number;
-            returnedCount: number;
             cancelledCount: number;
             priceTotal: string;
             feeTotal: string;
@@ -1859,7 +1842,7 @@ export interface components {
         OrdersPerDayStatusDto: {
             date: string;
             /** @enum {string} */
-            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
             orderCount: number;
         };
         FinancialDayDto: {
@@ -1878,7 +1861,6 @@ export interface components {
             townshipId: string;
             townshipName: string;
             deliveredCount: number;
-            returnedCount: number;
             cancelledCount: number;
             /** @description Percentage from 0 to 100, to two decimals */
             successRate: string;
@@ -1922,7 +1904,7 @@ export interface components {
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @enum {string} */
-            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
             needsAttention: boolean;
             createdAt: string;
             deliveredAt?: Record<string, never> | null;
@@ -1951,7 +1933,7 @@ export interface components {
         ShopOrderHistoryEventDto: {
             createdAt: string;
             /** @enum {string} */
-            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
             reason?: Record<string, never> | null;
         };
         ShopOrderDetailResponseDto: {
@@ -1969,7 +1951,7 @@ export interface components {
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @enum {string} */
-            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
             needsAttention: boolean;
             createdAt: string;
             deliveredAt?: Record<string, never> | null;
@@ -1993,7 +1975,7 @@ export interface components {
         ShopOrdersPerDayDto: {
             date: string;
             /** @enum {string} */
-            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+            displayStatus: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
             orderCount: number;
         };
         ShopDashboardResponseDto: {
@@ -2958,31 +2940,6 @@ export interface operations {
             };
         };
     };
-    OrdersController_returnOrder_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OrderReasonDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrderResponseDto"];
-                };
-            };
-        };
-    };
     OrdersController_approve_v1: {
         parameters: {
             query?: never;
@@ -3499,7 +3456,7 @@ export interface operations {
                 dateBasis?: "ENTRY" | "DELIVERED";
                 shopId?: string;
                 townshipId?: string;
-                status?: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+                status?: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
                 /** @description Rider or delivery partner id */
                 assigneeId?: string;
                 /** @description Search by tracking code, customer name, or phone */
@@ -3532,7 +3489,7 @@ export interface operations {
                 format: "csv" | "xlsx";
                 shopId?: string;
                 townshipId?: string;
-                status?: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "RETURNED" | "CANCELLED";
+                status?: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
                 assigneeId?: string;
                 /** @description Search by tracking code, customer name, or phone */
                 search?: string;
@@ -3758,7 +3715,7 @@ export interface operations {
                 dateBasis?: "ENTRY" | "DELIVERED";
                 timeFrom?: string;
                 timeTo?: string;
-                displayStatus?: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+                displayStatus?: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
                 needsAttention?: boolean;
                 /** @description Search customer name, phone, or tracking code */
                 search?: string;
@@ -3789,7 +3746,7 @@ export interface operations {
                 dateBasis?: "ENTRY" | "DELIVERED";
                 timeFrom?: string;
                 timeTo?: string;
-                displayStatus?: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED" | "RETURNED";
+                displayStatus?: "RECEIVED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
                 needsAttention?: boolean;
                 /** @description Search customer name, phone, or tracking code */
                 search?: string;

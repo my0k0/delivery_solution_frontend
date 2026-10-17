@@ -21,7 +21,7 @@ export function ShopOrderDetailPage() {
   if (!order.data) return <EmptyState title="Order not found" description="This order is unavailable in your shop account." />
 
   const detail = order.data
-  const statusStyle = detail.displayStatus === 'DELIVERED' ? 'bg-success/15 text-foreground' : detail.displayStatus === 'CANCELLED' || detail.displayStatus === 'RETURNED' ? 'bg-destructive/10 text-foreground' : detail.displayStatus === 'OUT_FOR_DELIVERY' ? 'bg-warning/25 text-foreground' : 'bg-muted text-foreground'
+  const statusStyle = detail.displayStatus === 'DELIVERED' ? 'bg-success/15 text-foreground' : detail.displayStatus === 'CANCELLED' ? 'bg-destructive/10 text-foreground' : detail.displayStatus === 'OUT_FOR_DELIVERY' ? 'bg-warning/25 text-foreground' : 'bg-muted text-foreground'
 
   return <div className="flex min-w-0 flex-col gap-4">
     <Link to="/shop/orders" className="inline-flex min-h-10 w-fit items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"><ArrowLeft className="size-4" aria-hidden="true" />Back to orders</Link>

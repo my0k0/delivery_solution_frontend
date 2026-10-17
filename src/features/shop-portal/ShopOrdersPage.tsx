@@ -14,7 +14,7 @@ import { usePermission } from '@/lib/auth/usePermission'
 const ORDER_PAGE_SIZE = 20
 
 function OrderStatusBadge({ status }: { status: ShopOrderStatus }) {
-  const badgeStyle = status === 'DELIVERED' ? 'bg-success/15 text-foreground' : status === 'CANCELLED' || status === 'RETURNED' ? 'bg-destructive/10 text-foreground' : status === 'OUT_FOR_DELIVERY' ? 'bg-warning/25 text-foreground' : 'bg-muted text-foreground'
+  const badgeStyle = status === 'DELIVERED' ? 'bg-success/15 text-foreground' : status === 'CANCELLED' ? 'bg-destructive/10 text-foreground' : status === 'OUT_FOR_DELIVERY' ? 'bg-warning/25 text-foreground' : 'bg-muted text-foreground'
   return <Badge className={badgeStyle}>{getShopStatusLabel(status)}</Badge>
 }
 

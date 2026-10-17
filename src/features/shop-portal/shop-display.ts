@@ -5,7 +5,6 @@ export const SHOP_STATUS_OPTIONS: ReadonlyArray<{ value: ShopOrderStatus; label:
   { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
   { value: 'DELIVERED', label: 'Delivered' },
   { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'RETURNED', label: 'Returned' },
 ]
 
 export function getShopStatusLabel(status: ShopDisplayStatus): string {

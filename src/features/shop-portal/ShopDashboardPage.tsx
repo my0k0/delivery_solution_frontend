@@ -17,7 +17,6 @@ const STATUS_SERIES = [
   { key: 'OUT_FOR_DELIVERY', label: 'Out for delivery', color: 'var(--chart-2)' },
   { key: 'DELIVERED', label: 'Delivered', color: 'var(--chart-3)' },
   { key: 'CANCELLED', label: 'Cancelled', color: 'var(--chart-4)' },
-  { key: 'RETURNED', label: 'Returned', color: 'var(--chart-5)' },
 ] as const
 
 const STATUS_TILES = [

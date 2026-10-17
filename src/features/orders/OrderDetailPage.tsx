@@ -22,7 +22,6 @@ import {
   markPartnerDelivered,
   orderKeys,
   postponeOrder,
-  returnOrder,
   sendBackOrder,
   updateOrder,
   type AssignBody,
@@ -36,7 +35,6 @@ import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { AssignOrderDialog } from '@/features/orders/AssignOrderDialog'
 import { PostponeOrderDialog } from '@/features/orders/PostponeOrderDialog'
 import { CancelOrderDialog } from '@/features/orders/CancelOrderDialog'
-import { ReturnOrderDialog } from '@/features/orders/ReturnOrderDialog'
 import { SendBackOrderDialog } from '@/features/orders/SendBackOrderDialog'
 import { ApproveOrderDialog } from '@/features/orders/ApproveOrderDialog'
 import { MarkDeliveredDialog } from '@/features/orders/MarkDeliveredDialog'
@@ -46,7 +44,6 @@ type OrderAction =
   | { type: 'assign'; body: AssignBody }
   | { type: 'postpone'; body: OrderReason }
   | { type: 'cancel'; body: OrderReason }
-  | { type: 'return'; body: OrderReason }
   | { type: 'send-back'; body: SendBackBody }
   | { type: 'approve' }
   | { type: 'mark-delivered' }
@@ -74,7 +71,7 @@ export function OrderDetailPage() {
   const canApprove = usePermission('deliveries.approve')
   const canReadWays = usePermission('ways.read')
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [activeDialog, setActiveDialog] = useState<'assign' | 'postpone' | 'cancel' | 'return' | 'send-back' | 'approve' | 'mark-delivered' | null>(null)
+  const [activeDialog, setActiveDialog] = useState<'assign' | 'postpone' | 'cancel' | 'send-back' | 'approve' | 'mark-delivered' | null>(null)
   const orderQuery = useQuery({ queryKey: orderKeys.detail(orderId), queryFn: () => fetchOrder(orderId), enabled: Boolean(orderId) })
   const wayQuery = useQuery({
     queryKey: wayKeys.detail(orderQuery.data?.wayId ?? ''),
@@ -92,7 +89,6 @@ export function OrderDetailPage() {
       if (action.type === 'assign') return assignOrder(orderId, action.body)
       if (action.type === 'postpone') return postponeOrder(orderId, action.body)
       if (action.type === 'cancel') return cancelOrder(orderId, action.body)
-      if (action.type === 'return') return returnOrder(orderId, action.body)
       if (action.type === 'send-back') return sendBackOrder(orderId, action.body)
       if (action.type === 'approve') return approveOrder(orderId)
       if (action.type === 'mark-delivered') return markPartnerDelivered(orderId)
@@ -102,11 +98,10 @@ export function OrderDetailPage() {
       const successMessage = action.type === 'assign' ? 'Assignee updated'
         : action.type === 'postpone' ? 'Order postponed'
           : action.type === 'cancel' ? 'Order cancelled'
-            : action.type === 'return' ? 'Order marked returned'
-              : action.type === 'send-back' ? 'Order sent back to rider queue'
-                : action.type === 'approve' ? 'Delivery approved'
-                  : action.type === 'mark-delivered' ? 'Partner order marked delivered'
-                    : 'Order changes saved'
+            : action.type === 'send-back' ? 'Order sent back to rider queue'
+              : action.type === 'approve' ? 'Delivery approved'
+                : action.type === 'mark-delivered' ? 'Partner order marked delivered'
+                  : 'Order changes saved'
       toast.success(successMessage)
       setActiveDialog(null)
       setIsEditOpen(false)
@@ -122,15 +117,14 @@ export function OrderDetailPage() {
   })
 
   const order = orderQuery.data
-  const canEdit = canUpdate && order !== undefined && order.status !== 'CANCELLED' && order.status !== 'RETURNED'
+  const canEdit = canUpdate && order !== undefined && order.status !== 'CANCELLED'
   const canAssignOrder = canUpdate && (order?.status === 'PENDING' || order?.status === 'ASSIGNED')
   const canPostponeOrder = canUpdate && order?.status === 'ASSIGNED'
   const canCancelOrder = canCancel && (order?.status === 'PENDING' || order?.status === 'ASSIGNED')
-  const canReturnOrder = canUpdate && (order?.status === 'PENDING' || order?.status === 'ASSIGNED')
   const canReviewOrder = canApprove && order?.status === 'AWAITING_APPROVAL'
   const canMarkPartnerDelivered = canApprove && order?.status === 'ASSIGNED' && order.assigneeType === 'PARTNER'
   const isDelayed = Boolean(order?.estimatedDeliveryDate && order.estimatedDeliveryDate < new Date().toISOString().slice(0, 10)
-    && !['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status))
+    && !['DELIVERED', 'CANCELLED'].includes(order.status))
 
   async function saveAction(action: OrderAction) {
     await actionMutation.mutateAsync(action)
@@ -160,7 +154,6 @@ export function OrderDetailPage() {
           {canAssignOrder && <Button variant="outline" onClick={() => setActiveDialog('assign')}>Assign / clear</Button>}
           {canPostponeOrder && <Button variant="outline" onClick={() => setActiveDialog('postpone')}>Postpone</Button>}
           {canCancelOrder && <Button variant="destructive" onClick={() => setActiveDialog('cancel')}>Cancel</Button>}
-          {canReturnOrder && <Button variant="outline" onClick={() => setActiveDialog('return')}>Return</Button>}
           {canReviewOrder && <><Button variant="outline" onClick={() => setActiveDialog('send-back')}>Send back</Button><Button onClick={() => setActiveDialog('approve')}>Approve</Button></>}
           {canMarkPartnerDelivered && <Button onClick={() => setActiveDialog('mark-delivered')}>Mark delivered</Button>}
         </div>
@@ -213,7 +206,6 @@ export function OrderDetailPage() {
       }} />
       <PostponeOrderDialog order={activeDialog === 'postpone' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onSave={async (reason) => saveAction({ type: 'postpone', body: { reason } })} />
       <CancelOrderDialog order={activeDialog === 'cancel' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onSave={async (reason) => saveAction({ type: 'cancel', body: { reason } })} />
-      <ReturnOrderDialog order={activeDialog === 'return' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onSave={async (reason) => saveAction({ type: 'return', body: { reason } })} />
       <SendBackOrderDialog order={activeDialog === 'send-back' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onSave={async (body) => saveAction({ type: 'send-back', body })} />
       <ApproveOrderDialog order={activeDialog === 'approve' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onConfirm={async () => saveAction({ type: 'approve' })} />
       <MarkDeliveredDialog order={activeDialog === 'mark-delivered' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onConfirm={async () => saveAction({ type: 'mark-delivered' })} />

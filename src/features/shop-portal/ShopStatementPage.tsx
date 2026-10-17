@@ -13,7 +13,6 @@ const STATEMENT_COUNTS = [
   { key: 'receivedCount', label: 'Received' },
   { key: 'outForDeliveryCount', label: 'Out for delivery' },
   { key: 'deliveredCount', label: 'Delivered' },
-  { key: 'returnedCount', label: 'Returned' },
   { key: 'cancelledCount', label: 'Cancelled' },
 ] as const
 
@@ -51,7 +50,7 @@ export function ShopStatementPage() {
     </section>
     {!isDateRangeValid ? <p role="alert" className="text-sm text-destructive">The start date must not be after the end date.</p> : statement.isLoading ? <div aria-label="Loading statement" className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div> : statement.isError ? <EmptyState title="Could not load your statement" description={getApiErrorMessage(statement.error)} /> : statement.data ? <>
       <p className="text-sm text-muted-foreground">{statement.data.shopName} · {statement.data.dateFrom} to {statement.data.dateTo} · {statement.data.dateBasis === 'DELIVERED' ? 'Delivered date' : 'Entry date'}</p>
-      <section aria-label="Order counts by status" className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{STATEMENT_COUNTS.map(({ key, label }) => <Card size="sm" key={key}><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">{label}</CardTitle></CardHeader><CardContent><p className="font-mono text-2xl font-semibold tabular-nums">{statement.data[key]}</p></CardContent></Card>)}</section>
+      <section aria-label="Order counts by status" className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{STATEMENT_COUNTS.map(({ key, label }) => <Card size="sm" key={key}><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">{label}</CardTitle></CardHeader><CardContent><p className="font-mono text-2xl font-semibold tabular-nums">{statement.data[key]}</p></CardContent></Card>)}</section>
       <section aria-label="Statement totals" className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <MoneyCard title="Package price" amount={statement.data.priceTotal} /><MoneyCard title="Delivery fees" amount={statement.data.feeTotal} /><MoneyCard title="COD collected" amount={statement.data.codCollected} /><MoneyCard title="COD expected" amount={statement.data.codExpected} /><MoneyCard title="Net settlement · delivered (estimated)" amount={statement.data.netOwedToShopDelivered} /><MoneyCard title="Net settlement · pending (estimated)" amount={statement.data.pendingNetOwedToShop} /><MoneyCard title="Net settlement · total (estimated)" amount={statement.data.netOwedToShopTotal} />
       </section>

@@ -11,7 +11,6 @@ const ORDER_STATUS_SERIES = [
   { status: 'ASSIGNED', label: 'Assigned', color: 'var(--chart-3)' },
   { status: 'AWAITING_APPROVAL', label: 'Awaiting approval', color: 'var(--warning)' },
   { status: 'DELIVERED', label: 'Delivered', color: 'var(--success)' },
-  { status: 'RETURNED', label: 'Returned', color: 'var(--chart-2)' },
   { status: 'CANCELLED', label: 'Cancelled', color: 'var(--destructive)' },
 ] as const
 
@@ -181,7 +180,7 @@ export function TownshipSuccessChart({ data }: { data: TownshipRate[] }) {
           <span className="truncate font-medium">{township.townshipName}</span><span className="font-mono tabular-nums">{township.successRate}% success</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${township.townshipName} success rate`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(township.successRate)}><div className="h-full rounded-full bg-success" style={{ width: `${township.successRate}%` }} /></div>
-        <p className="mt-1 text-xs text-muted-foreground">{township.deliveredCount} delivered · {township.returnedCount} returned · {township.cancelledCount} cancelled</p>
+        <p className="mt-1 text-xs text-muted-foreground">{township.deliveredCount} delivered · {township.cancelledCount} cancelled</p>
       </li>)}
     </ul> : <ChartEmpty description="No completed order outcomes in this date range." />}
   </ChartFrame>
