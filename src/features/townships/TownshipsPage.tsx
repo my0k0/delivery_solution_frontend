@@ -12,8 +12,8 @@ import { useTownships, type Township } from './api'
 
 export function TownshipsPage() {
   const { data: townships = [], isLoading, isError, error } = useTownships()
-  const canCreate = usePermission('orders.create')
-  const canUpdate = usePermission('orders.update')
+  const canCreate = usePermission('townships.create')
+  const canUpdate = usePermission('townships.update')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [townshipToEdit, setTownshipToEdit] = useState<Township | undefined>()
 

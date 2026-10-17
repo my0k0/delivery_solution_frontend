@@ -102,12 +102,6 @@ export type Township = Omit<components['schemas']['TownshipResponseDto'], 'defau
   defaultPartnerId: string | null
 }
 
-export type TownshipBody = Pick<components['schemas']['CreateTownshipDto'], 'name' | 'defaultDeliveryFee' | 'leadTimeDays'> & {
-  defaultAssigneeType: AssigneeType | null
-  defaultRiderId: string | null
-  defaultPartnerId: string | null
-}
-
 export type DeliveryPartner = Omit<components['schemas']['DeliveryPartnerResponseDto'], 'phone' | 'note'> & {
   phone: string | null
   note: string | null
@@ -197,18 +191,6 @@ export async function markPartnerDelivered(orderId: string): Promise<Order> {
 
 export async function fetchTownships(): Promise<Township[]> {
   return (await http.get<Township[]>('/townships')).data
-}
-
-export async function createTownship(body: TownshipBody): Promise<Township> {
-  return (await http.post<Township>('/townships', body)).data
-}
-
-export async function updateTownship(townshipId: string, body: Partial<TownshipBody>): Promise<Township> {
-  return (await http.patch<Township>(`/townships/${townshipId}`, body)).data
-}
-
-export async function deleteTownship(townshipId: string): Promise<void> {
-  await http.delete(`/townships/${townshipId}`)
 }
 
 export async function fetchDeliveryPartners(): Promise<DeliveryPartner[]> {
