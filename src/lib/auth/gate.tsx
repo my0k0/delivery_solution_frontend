@@ -35,3 +35,7 @@ export function RequireAuth() {
   }
   return <Outlet />
 }
+
+// Restored feature modules import `usePermission` from this gate module.
+// Re-export so both that path and './usePermission' resolve to one definition.
+export { usePermission } from '@/lib/auth/usePermission'

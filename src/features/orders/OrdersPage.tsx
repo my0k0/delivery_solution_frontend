@@ -1,112 +1,165 @@
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search } from 'lucide-react'
-import { usePermission } from '@/lib/auth/usePermission'
-import { readApiError } from '@/lib/api/client'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { EmptyState } from '@/components/EmptyState'
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { toNullableString } from '@/lib/nullable'
-import { formatDate } from '@/lib/utils'
-import { OrderCreateDialog } from './components/OrderCreateDialog'
-import { useOrders, type OrdersFilters, type OrderStatus } from './api'
-import { OrderDetailDialog } from './components/OrderDetailDialog'
+import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/EmptyState'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { usePermission } from '@/lib/auth/gate'
+import { fetchRiders } from '@/features/riders/api'
+import { useShops } from '@/features/shops/api'
+import {
+  createOrder,
+  fetchDeliveryPartners,
+  fetchOrders,
+  fetchTownships,
+  orderKeys,
+  ORDER_STATUSES,
+  type OrderBody,
+  type OrderDateBasis,
+  type OrderFilters,
+  type OrderStatus,
+} from '@/features/orders/api'
+import { calculateCodToCollect, calculateNetOwedToShop } from '@/features/orders/money'
+import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
+import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
+import { wayKeys } from '@/features/ways/api'
 
 const PAGE_SIZE = 20
 
 export function OrdersPage() {
-  const [filters, setFilters] = useState<OrdersFilters>({ page: 1, perPage: PAGE_SIZE })
-  const [searchInput, setSearchInput] = useState('')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [selectedOrderId, setSelectedOrderId] = useState<string | undefined>()
   const canCreate = usePermission('orders.create')
-  const { data, isLoading, isError, error } = useOrders(filters)
+  const navigate = useNavigate()
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [shopId, setShopId] = useState('')
+  const [townshipId, setTownshipId] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
+  const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dateBasis, setDateBasis] = useState<OrderDateBasis>('ENTRY')
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const shops = useShops({ page: 1, perPage: 100 })
+  const townships = useQuery({ queryKey: orderKeys.townships, queryFn: fetchTownships })
+  const riders = useQuery({ queryKey: ['operations', 'riders', 'active'], queryFn: () => fetchRiders({ page: 1, perPage: 100, status: 'ACTIVE' }) })
+  const partners = useQuery({ queryKey: orderKeys.partners, queryFn: fetchDeliveryPartners })
+  const filters: OrderFilters = {
+    page,
+    perPage: PAGE_SIZE,
+    search: search.trim() || undefined,
+    status: status ? status as OrderStatus : undefined,
+    shopId: shopId || undefined,
+    townshipId: townshipId || undefined,
+    assigneeId: assigneeId || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    dateBasis,
+  }
+  const orders = useQuery({ queryKey: orderKeys.list(filters), queryFn: () => fetchOrders(filters) })
+  const createMutation = useMutation({
+    mutationFn: (body: OrderBody) => createOrder(body),
+    onSuccess: async (order) => {
+      await queryClient.invalidateQueries({ queryKey: orderKeys.all })
+      await queryClient.invalidateQueries({ queryKey: wayKeys.all })
+      setIsFormOpen(false)
+      navigate(`/orders/${order.id}`)
+    },
+  })
+
+  function resetToFirstPage(update: () => void) {
+    setPage(1)
+    update()
+  }
+
+  const assigneeOptions = [
+    ...(riders.data?.data ?? []).map((rider) => ({ value: rider.id, label: `${rider.name} · Rider` })),
+    ...(partners.data ?? []).filter((partner) => partner.isActive).map((partner) => ({ value: partner.id, label: `${partner.name} · Partner` })),
+  ]
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h1 className="text-xl font-semibold tracking-tight">Orders</h1><p className="text-sm text-muted-foreground">Orders registered after packages arrive at the office.</p></div>
-        {canCreate && <Button onClick={() => setCreateOpen(true)}><Plus className="size-4" />New order</Button>}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor="order-status" className="flex items-center gap-2 text-sm">Status
-          <select
-            id="order-status"
-            className="h-10 rounded-md border border-input bg-background px-3"
-            value={filters.status ?? ''}
-            onChange={(event) => {
-              const selectedStatus = event.target.value
-              setFilters((previous) => ({ ...previous, page: 1, status: isOrderStatus(selectedStatus) ? selectedStatus : undefined }))
-            }}
-          >
-            <option value="">All statuses</option>
-            <option value="ASSIGNED">Assigned</option>
-            <option value="DELIVERED">Delivered</option>
-            <option value="FAILED">Failed</option>
-          </select>
-        </label>
-        <form
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const search = searchInput.trim()
-            setFilters((previous) => ({ ...previous, page: 1, search: search || undefined }))
-          }}
-        >
-          <label htmlFor="order-search" className="sr-only">Search tracking code, customer name, or phone</label>
-          <div className="relative w-64 max-w-full">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="order-search"
-              type="search"
-              className="pl-9"
-              placeholder="Search orders"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
-          </div>
-        </form>
-      </div>
-      {isLoading ? (
-        <div className="flex flex-col gap-3">{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>
-      ) : isError ? (
-        <EmptyState title="Could not load orders" description={readApiError(error).message ?? 'Unexpected error'} />
-      ) : data?.data.length === 0 ? (
-        <EmptyState title="No orders yet" description="Register an order once its package has arrived at the office." />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader><TableRow><TableHead>Tracking</TableHead><TableHead>Township</TableHead><TableHead>Shop</TableHead><TableHead>Customer</TableHead><TableHead>Phone</TableHead><TableHead>Assigned rider</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
-            <TableBody>{data?.data.map((order) => (
-              <TableRow key={order.id} className="cursor-pointer" tabIndex={0} onClick={() => setSelectedOrderId(order.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedOrderId(order.id) }}>
-                <TableCell className="font-mono text-sm font-medium">{order.trackingCode}</TableCell>
-                <TableCell>{order.townshipName}</TableCell>
-                <TableCell>{order.shopName}</TableCell>
-                <TableCell>{order.customerName}</TableCell>
-                <TableCell>{toNullableString(order.customerPhone ?? null) ?? '—'}</TableCell>
-                <TableCell>{typeof order.riderName === 'string' ? order.riderName : '—'}</TableCell>
-                <TableCell><OrderStatusBadge status={order.status} /></TableCell>
-                <TableCell className="text-muted-foreground">{formatDate(order.createdAt)}</TableCell>
-              </TableRow>
-            ))}</TableBody>
-          </Table>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Orders</h1>
+          <p className="text-sm text-muted-foreground">Search and manage order delivery, collection, and shop balances.</p>
         </div>
+        {canCreate && <Button onClick={() => setIsFormOpen(true)}><Plus className="size-4" />Create order</Button>}
+      </div>
+
+      <section aria-label="Order filters" className="grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="relative flex flex-col gap-2">
+          <label htmlFor="order-search" className="text-sm font-medium">Search</label>
+          <Search className="absolute left-3 top-[2.55rem] size-4 text-muted-foreground" aria-hidden="true" />
+          <Input id="order-search" className="pl-9" value={search} placeholder="Tracking code, name, phone, address" onChange={(event) => resetToFirstPage(() => setSearch(event.target.value))} />
+        </div>
+        <OrderSelectField id="order-filter-status" label="Status" value={status} options={ORDER_STATUSES.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} placeholder="All statuses" onChange={(value) => resetToFirstPage(() => setStatus(value))} />
+        <OrderSelectField id="order-filter-shop" label="Shop" value={shopId} options={(shops.data?.data ?? []).map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="All shops" onChange={(value) => resetToFirstPage(() => setShopId(value))} />
+        <OrderSelectField id="order-filter-township" label="Township" value={townshipId} options={(townships.data ?? []).map((township) => ({ value: township.id, label: township.name }))} placeholder="All townships" onChange={(value) => resetToFirstPage(() => setTownshipId(value))} />
+        <OrderSelectField id="order-filter-assignee" label="Assignee" value={assigneeId} options={assigneeOptions} placeholder="All assignees" onChange={(value) => resetToFirstPage(() => setAssigneeId(value))} />
+        <OrderSelectField id="order-date-basis" label="Date basis" value={dateBasis} options={[{ value: 'ENTRY', label: 'Entry date' }, { value: 'DELIVERED', label: 'Delivered date' }]} onChange={(value) => resetToFirstPage(() => setDateBasis(value as OrderDateBasis))} />
+        <div className="flex flex-col gap-2">
+          <label htmlFor="order-date-from" className="text-sm font-medium">From</label>
+          <Input id="order-date-from" type="date" value={dateFrom} onChange={(event) => resetToFirstPage(() => setDateFrom(event.target.value))} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="order-date-to" className="text-sm font-medium">To</label>
+          <Input id="order-date-to" type="date" value={dateTo} onChange={(event) => resetToFirstPage(() => setDateTo(event.target.value))} />
+        </div>
+      </section>
+
+      {orders.isLoading ? (
+        <div className="space-y-2" aria-label="Loading orders">
+          {[0, 1, 2, 3].map((row) => <div key={row} className="h-12 animate-pulse rounded-md bg-muted" />)}
+        </div>
+      ) : orders.isError ? (
+        <p role="alert" className="rounded-md border border-destructive p-4 text-sm text-destructive">{orders.error.message || 'Could not load orders.'}</p>
+      ) : orders.data?.data.length ? (
+        <>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right">Net owed to shop</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                {orders.data.data.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell><Link className="font-mono font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" to={`/orders/${order.id}`}>{order.trackingCode}</Link></TableCell>
+                    <TableCell><Badge className={order.status === 'DELIVERED' ? 'bg-success text-success-foreground' : order.status === 'AWAITING_APPROVAL' ? 'bg-warning text-warning-foreground' : ''} variant={order.status === 'CANCELLED' ? 'destructive' : 'secondary'}>{order.status.replaceAll('_', ' ')}</Badge></TableCell>
+                    <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{order.estimatedDeliveryDate ?? '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{calculateCodToCollect(order)}</TableCell>
+                    <TableCell className="text-right font-mono">{calculateNetOwedToShop(order)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+            <span>{orders.data.meta.total} orders · Page {orders.data.meta.page} of {Math.max(orders.data.meta.totalPages, 1)}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" disabled={page <= 1} onClick={() => setPage((currentPage) => currentPage - 1)}>Previous</Button>
+              <Button variant="outline" disabled={page >= orders.data.meta.totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}>Next</Button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <EmptyState title="No orders found" description="Adjust the filters or create an order to get started." />
       )}
-      {data && data.meta.totalPages > 1 && <Pagination><PaginationContent><PaginationItem><PaginationPrevious onClick={() => setFilters((previous) => ({ ...previous, page: Math.max(1, previous.page - 1) }))} /></PaginationItem><PaginationItem><span className="text-sm text-muted-foreground">Page {filters.page} of {data.meta.totalPages}</span></PaginationItem><PaginationItem><PaginationNext onClick={() => setFilters((previous) => ({ ...previous, page: Math.min(data.meta.totalPages, previous.page + 1) }))} /></PaginationItem></PaginationContent></Pagination>}
-      <OrderCreateDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-      <OrderDetailDialog orderId={selectedOrderId} onClose={() => setSelectedOrderId(undefined)} />
+
+      {isFormOpen && <OrderFormDialog
+        open={isFormOpen}
+        order={null}
+        pending={createMutation.isPending}
+        onClose={() => setIsFormOpen(false)}
+        onSave={async (body) => {
+          if (!('shopId' in body) || !('customerId' in body) || !('packagePrice' in body)) throw new Error('Invalid order fields.')
+          await createMutation.mutateAsync(body as OrderBody)
+        }}
+      />}
     </div>
   )
-}
-
-function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  const variant = status === 'DELIVERED' ? 'default' : status === 'FAILED' ? 'destructive' : 'secondary'
-  return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>
-}
-
-function isOrderStatus(value: string): value is OrderStatus {
-  return value === 'ASSIGNED' || value === 'DELIVERED' || value === 'FAILED'
 }

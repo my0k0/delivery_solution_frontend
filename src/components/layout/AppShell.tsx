@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,6 @@ import { Navbar } from "./NavBar";
 export function AppShell() {
   const user = useAuthStore((state) => state.user);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  if (user?.role === 'RIDER') {
-    return <Navigate to="/rider" replace />
-  }
 
   return (
     <div className="flex min-h-screen">

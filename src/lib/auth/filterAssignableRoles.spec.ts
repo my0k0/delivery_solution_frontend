@@ -43,6 +43,7 @@ function user(role: string): User {
     phone: null,
     roleId: 'r-x',
     role,
+    shopId: null,
     status: 'ACTIVE',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
