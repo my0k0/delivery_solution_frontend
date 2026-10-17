@@ -301,7 +301,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
         </fieldset>
         <div className="grid gap-3 rounded-md bg-muted p-3 text-sm sm:grid-cols-2">
           <p>COD to collect <strong className="font-mono">{calculateCodToCollect(moneyPreview)}</strong></p>
-          <p>Net owed to shop <strong className="font-mono">{calculateNetOwedToShop(moneyPreview)}</strong></p>
+          <p>Net owed to shop (estimated) <strong className="font-mono">{calculateNetOwedToShop(moneyPreview)}</strong></p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="order-notes">Notes</Label>

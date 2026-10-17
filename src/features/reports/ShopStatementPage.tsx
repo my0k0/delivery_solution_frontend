@@ -42,10 +42,10 @@ export function ShopStatementPage() {
         <MoneySummary title="Delivery fee total" amount={statement.data.feeTotal} />
         <MoneySummary title="COD collected on delivered orders" amount={statement.data.codCollected} />
         <MoneySummary title="COD expected on open orders" amount={statement.data.codExpected} />
-        <MoneySummary title="Net owed to shop · delivered" amount={statement.data.netOwedToShopDelivered} />
-        <MoneySummary title="Net owed to shop · pending" amount={statement.data.pendingNetOwedToShop} />
+        <MoneySummary title="Net owed to shop · delivered (estimated)" amount={statement.data.netOwedToShopDelivered} />
+        <MoneySummary title="Net owed to shop · pending (estimated)" amount={statement.data.pendingNetOwedToShop} />
       </section>
-      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules. Positive means the company owes the shop; negative means the shop owes the company.</p>
+      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules. Positive means the company owes the shop; negative means the shop owes the company. It is an estimate derived from order fields — the system holds no record of money actually received or paid, so treat it as an expectation, not a settled balance.</p>
     </> : null}
   </div>
 }

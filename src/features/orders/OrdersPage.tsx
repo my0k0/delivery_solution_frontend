@@ -122,7 +122,7 @@ export function OrdersPage() {
           <div className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right">Net owed to shop</TableHead>
+                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right">Net owed to shop (estimated)</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {orders.data.data.map((order) => (

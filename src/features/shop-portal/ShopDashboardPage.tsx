@@ -119,7 +119,7 @@ export function ShopDashboardPage() {
       </section>
       <section aria-label="Shop settlement summary" className="grid min-w-0 gap-3 sm:grid-cols-2">
         <MoneyCard title="COD collected" amount={dashboard.data.money.codCollected} description="From delivered orders" />
-        <MoneyCard title="Net settlement" amount={dashboard.data.money.netSettlementDelivered} description="Net owed on delivered orders" />
+        <MoneyCard title="Net settlement (estimated)" amount={dashboard.data.money.netSettlementDelivered} description="Net owed on delivered orders" />
       </section>
       <Card className="min-w-0">
         <CardHeader><CardTitle className="text-base">Orders per day by status</CardTitle><p className="text-sm text-muted-foreground">{dateFrom} to {dateTo} · Entry date</p></CardHeader>

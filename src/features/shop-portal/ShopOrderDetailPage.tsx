@@ -37,7 +37,7 @@ export function ShopOrderDetailPage() {
       <DetailField label="Estimated date" value={formatShopDate(detail.estimatedDeliveryDate)} />
     </section>
     <section className="rounded-lg border bg-card p-4" aria-label="Order amounts"><h2 className="text-base font-semibold">Order amounts</h2><dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-      <MoneyField label="Package price" amount={detail.packagePrice} /><MoneyField label="Delivery fee" amount={detail.deliveryFee} /><MoneyField label="Total" amount={detail.total} emphasized /><MoneyField label="COD to collect" amount={detail.codToCollect} /><MoneyField label="Net settlement" amount={detail.netOwedToShop} />
+      <MoneyField label="Package price" amount={detail.packagePrice} /><MoneyField label="Delivery fee" amount={detail.deliveryFee} /><MoneyField label="Total" amount={detail.total} emphasized /><MoneyField label="COD to collect" amount={detail.codToCollect} /><MoneyField label="Net settlement (estimated)" amount={detail.netOwedToShop} />
     </dl></section>
     <section className="rounded-lg border bg-card p-4" aria-label="Order history"><h2 className="text-base font-semibold">Order history</h2>{detail.history.length ? <ol className="mt-4 flex flex-col">{detail.history.map((event, index) => <li key={`${event.createdAt}-${index}`} className="relative grid grid-cols-[1rem_minmax(0,1fr)] gap-x-3 pb-5 last:pb-0">
       <span aria-hidden="true" className="relative mt-1 flex size-4 items-center justify-center"><span className="size-2.5 rounded-full bg-primary" />{index < detail.history.length - 1 && <span className="absolute top-3.5 h-full w-px bg-border" />}</span>

@@ -175,7 +175,7 @@ export function OrderDetailPage() {
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Package price</p><p className="mt-1 font-mono">{order.packagePrice}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivery fee</p><p className="mt-1 font-mono">{order.deliveryFee}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">COD to collect</p><p className="mt-1 font-mono font-semibold">{calculateCodToCollect(order)}</p></div>
-        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Net owed to shop</p><p className="mt-1 font-mono font-semibold">{calculateNetOwedToShop(order)}</p></div>
+        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Net owed to shop (estimated)</p><p className="mt-1 font-mono font-semibold">{calculateNetOwedToShop(order)}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Estimated delivery</p><p className="mt-1">{order.estimatedDeliveryDate ?? '—'}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivered at</p><p className="mt-1">{order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : '—'}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Payment to shop</p><p className="mt-1">Package {order.isPackagePaidToShop ? 'paid' : 'unpaid'} · Fee {order.isFeePaidToShop ? 'paid' : 'unpaid'}</p></div>
