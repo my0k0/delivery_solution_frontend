@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import type { Rider } from '@/features/riders/api'
 import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
+import { AMOUNT_PATTERN, COMMISSION_MAX_LENGTH } from '@/lib/constants'
 import { toNullableString } from '@/lib/nullable'
 
 interface RiderCommissionOverrideDialogProps {
@@ -24,7 +25,7 @@ export function RiderCommissionOverrideDialog({ rider, onSave }: RiderCommission
   const [message, setMessage] = useState('')
 
   async function submit() {
-    if (value && !/^\d+(\.\d{1,2})?$/.test(value)) {
+    if (value && !AMOUNT_PATTERN.test(value)) {
       setMessage('Enter a non-negative amount with up to two decimal places.')
       return
     }
@@ -53,7 +54,7 @@ export function RiderCommissionOverrideDialog({ rider, onSave }: RiderCommission
           </DialogHeader>
           <div className="flex flex-col gap-2">
             <Label htmlFor={`rider-commission-${rider.id}`}>Override per way (MMK)</Label>
-            <Input id={`rider-commission-${rider.id}`} inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} placeholder="Use global rate" />
+            <Input id={`rider-commission-${rider.id}`} inputMode="decimal" maxLength={COMMISSION_MAX_LENGTH} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Use global rate" />
           </div>
           {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
           <DialogFooter>

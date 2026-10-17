@@ -1,22 +1,52 @@
 import { z } from 'zod'
-import { MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from '@/lib/constants'
+import { FIELD_LIMITS, MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from '@/lib/constants'
 import { USER_STATUSES } from '@/lib/constants/user-status'
 import { VEHICLE_TYPES } from './vehicle-types'
 
 /** Fields that exist in both modes. */
 const riderProfileFields = {
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be at most 100 characters'),
-  phone: z.string().max(50, 'Phone must be at most 50 characters').nullable(),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(FIELD_LIMITS.rider.name, `Name must be at most ${FIELD_LIMITS.rider.name} characters`),
+  phone: z
+    .string()
+    .max(FIELD_LIMITS.rider.phone, `Phone must be at most ${FIELD_LIMITS.rider.phone} characters`)
+    .nullable(),
   status: z.enum(USER_STATUSES),
-  licenseNo: z.string().max(100, 'License number must be at most 100 characters').nullable(),
+  licenseNo: z
+    .string()
+    .max(
+      FIELD_LIMITS.rider.licenseNo,
+      `License number must be at most ${FIELD_LIMITS.rider.licenseNo} characters`,
+    )
+    .nullable(),
   vehicleType: z.enum(VEHICLE_TYPES),
-  vehiclePlate: z.string().max(50, 'Vehicle plate must be at most 50 characters').nullable(),
-  nrcNumber: z.string().max(100, 'NRC number must be at most 100 characters').nullable(),
+  vehiclePlate: z
+    .string()
+    .max(
+      FIELD_LIMITS.rider.vehiclePlate,
+      `Vehicle plate must be at most ${FIELD_LIMITS.rider.vehiclePlate} characters`,
+    )
+    .nullable(),
+  nrcNumber: z
+    .string()
+    .max(
+      FIELD_LIMITS.rider.nrcNumber,
+      `NRC number must be at most ${FIELD_LIMITS.rider.nrcNumber} characters`,
+    )
+    .nullable(),
   emergencyContactPhone: z
     .string()
-    .max(50, 'Emergency contact phone must be at most 50 characters')
+    .max(
+      FIELD_LIMITS.rider.emergencyContactPhone,
+      `Emergency contact phone must be at most ${FIELD_LIMITS.rider.emergencyContactPhone} characters`,
+    )
     .nullable(),
-  notes: z.string().max(500, 'Notes must be at most 500 characters').nullable(),
+  notes: z
+    .string()
+    .max(FIELD_LIMITS.rider.notes, `Notes must be at most ${FIELD_LIMITS.rider.notes} characters`)
+    .nullable(),
 }
 
 /**
@@ -45,6 +75,7 @@ export function riderSchema(requiresAccount: boolean) {
     .object({
       ...riderProfileFields,
       email: z.union([
+        // 255 is client-side only: the API types email as @IsEmail with no max.
         z.literal(''),
         z.string().email('Enter a valid email').max(255, 'Email must be at most 255 characters'),
       ]),

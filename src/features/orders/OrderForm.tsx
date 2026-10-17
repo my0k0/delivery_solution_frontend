@@ -18,6 +18,7 @@ import {
 import { calculateCodToCollect, calculateEstimatedDate, calculateNetOwedToShop } from '@/features/orders/money'
 import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
+import { AMOUNT_PATTERN, FIELD_LIMITS } from '@/lib/constants'
 import { useQuery } from '@tanstack/react-query'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
 import { TownshipChangeDialog } from '@/features/orders/TownshipChangeDialog'
@@ -184,7 +185,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       setMessage('Choose both a shop and a customer.')
       return
     }
-    if (!/^\d{1,10}(\.\d{1,2})?$/.test(draft.packagePrice) || !/^\d{1,10}(\.\d{1,2})?$/.test(draft.deliveryFee)) {
+    if (!AMOUNT_PATTERN.test(draft.packagePrice) || !AMOUNT_PATTERN.test(draft.deliveryFee)) {
       setMessage('Enter amounts with up to two decimal places.')
       return
     }
@@ -286,11 +287,11 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-partner-tracking">Partner tracking number</Label>
-            <Input id="order-partner-tracking" value={draft.partnerTrackingNo} onChange={(event) => updateDraft({ partnerTrackingNo: event.target.value })} />
+            <Input id="order-partner-tracking" maxLength={FIELD_LIMITS.order.partnerTrackingNo} value={draft.partnerTrackingNo} onChange={(event) => updateDraft({ partnerTrackingNo: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2 sm:col-span-2">
             <Label htmlFor="order-address">Delivery address</Label>
-            <Input id="order-address" value={draft.deliveryAddress} onChange={(event) => updateDraft({ deliveryAddress: event.target.value })} />
+            <Input id="order-address" maxLength={FIELD_LIMITS.order.deliveryAddress} value={draft.deliveryAddress} onChange={(event) => updateDraft({ deliveryAddress: event.target.value })} />
           </div>
         </div>
         <fieldset disabled={costFieldsDisabled} className="flex flex-wrap gap-x-6 gap-y-3 rounded-md border border-border p-3 text-sm disabled:opacity-60">
@@ -304,12 +305,12 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="order-notes">Notes</Label>
-          <textarea id="order-notes" className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} />
+          <textarea id="order-notes" maxLength={FIELD_LIMITS.order.notes} className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} />
         </div>
         {isDeliveredOrder && hasChangedMoneyFields && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-edit-reason">Reason for changing delivered order costs</Label>
-            <textarea id="order-edit-reason" required className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.reason} onChange={(event) => updateDraft({ reason: event.target.value })} />
+            <textarea id="order-edit-reason" required maxLength={FIELD_LIMITS.order.reason} className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.reason} onChange={(event) => updateDraft({ reason: event.target.value })} />
           </div>
         )}
         {message && <p role="alert" className="text-sm text-destructive">{message}</p>}

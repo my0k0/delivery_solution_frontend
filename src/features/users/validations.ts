@@ -1,12 +1,18 @@
 import { z } from 'zod'
 import { USER_STATUSES } from '@/lib/constants/user-status'
-import { MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from '@/lib/constants'
+import { FIELD_LIMITS, MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH } from '@/lib/constants'
 
 const userBaseFields = {
-  name: z.string().min(1, 'Name is required'),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(FIELD_LIMITS.user.name, `Name must be at most ${FIELD_LIMITS.user.name} characters`),
   email: z.string().email('Enter a valid email'),
   // Runtime: "" | "09123456789" | null (codegen stubs phone as Record<string,never>|null).
-  phone: z.string().nullable(),
+  phone: z
+    .string()
+    .max(FIELD_LIMITS.user.phone, `Phone must be at most ${FIELD_LIMITS.user.phone} characters`)
+    .nullable(),
   roleId: z.string().min(1, 'Select a role'),
   shopId: z.string().optional(),
 }

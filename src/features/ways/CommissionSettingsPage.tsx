@@ -10,6 +10,7 @@ import { fetchRiders, ridersKeys, updateRider } from '@/features/riders/api'
 import { RiderCommissionOverrideDialog } from '@/features/ways/RiderCommissionOverrideDialog'
 import { fetchCommissionRate, wayKeys, updateCommissionRate } from '@/features/ways/api'
 import { getApiErrorMessage } from '@/lib/api/client'
+import { AMOUNT_PATTERN } from '@/lib/constants'
 import { usePermission } from '@/lib/auth/usePermission'
 
 export function CommissionSettingsPage() {
@@ -37,7 +38,7 @@ export function CommissionSettingsPage() {
   function saveRate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const value = rateDraft ?? rate.data?.value ?? ''
-    if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+    if (!AMOUNT_PATTERN.test(value)) {
       setRateMessage('Enter a non-negative amount with up to two decimal places.')
       return
     }

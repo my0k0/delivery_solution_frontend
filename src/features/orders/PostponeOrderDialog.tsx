@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import type { Order } from '@/features/orders/api'
 import { usePermission } from '@/lib/auth/usePermission'
+import { FIELD_LIMITS } from '@/lib/constants'
 
 interface PostponeOrderDialogProps {
   order: Order | null
@@ -30,7 +31,7 @@ export function PostponeOrderDialog({ order, pending, onClose, onSave }: Postpon
       <DialogContent>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <DialogHeader><DialogTitle>Postpone delivery</DialogTitle><DialogDescription>{order?.trackingCode} will return to the pending queue. Give the shop a reason.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-2"><Label htmlFor="postpone-reason">Reason visible to shop</Label><Input id="postpone-reason" required minLength={1} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+          <div className="flex flex-col gap-2"><Label htmlFor="postpone-reason">Reason visible to shop</Label><Input id="postpone-reason" required minLength={1} maxLength={FIELD_LIMITS.order.reason} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
           {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
           <DialogFooter><Button type="button" variant="outline" onClick={onClose}>Keep assigned</Button>{canUpdateOrder && <Button type="submit" disabled={pending || !reason.trim()}>{pending ? 'Saving…' : 'Postpone order'}</Button>}</DialogFooter>
         </form>

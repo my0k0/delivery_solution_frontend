@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FIELD_LIMITS } from '@/lib/constants'
 import { CHANNEL_TYPES } from './channel-types'
 
 /**
@@ -21,15 +22,33 @@ import { CHANNEL_TYPES } from './channel-types'
 export const shopSchema = z.object({
   // Server has @IsString + @MaxLength(150) but NO @IsNotEmpty — empty string
   // passes validation and is stored. Enforce non-empty client-side.
-  name: z.string().min(1, 'Name is required').max(150, 'Name must be at most 150 characters'),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(FIELD_LIMITS.shop.name, `Name must be at most ${FIELD_LIMITS.shop.name} characters`),
   channelType: z.enum(CHANNEL_TYPES),
   channelName: z
     .string()
     .min(1, 'Channel name is required')
-    .max(200, 'Channel name must be at most 200 characters'),
-  phone: z.string().max(20, 'Phone must be at most 20 characters').nullable(),
-  address: z.string().max(300, 'Address must be at most 300 characters').nullable(),
-  notes: z.string().max(500, 'Notes must be at most 500 characters').nullable(),
+    .max(
+      FIELD_LIMITS.shop.channelName,
+      `Channel name must be at most ${FIELD_LIMITS.shop.channelName} characters`,
+    ),
+  phone: z
+    .string()
+    .max(FIELD_LIMITS.shop.phone, `Phone must be at most ${FIELD_LIMITS.shop.phone} characters`)
+    .nullable(),
+  address: z
+    .string()
+    .max(
+      FIELD_LIMITS.shop.address,
+      `Address must be at most ${FIELD_LIMITS.shop.address} characters`,
+    )
+    .nullable(),
+  notes: z
+    .string()
+    .max(FIELD_LIMITS.shop.notes, `Notes must be at most ${FIELD_LIMITS.shop.notes} characters`)
+    .nullable(),
 })
 
 export type ShopValues = z.infer<typeof shopSchema>

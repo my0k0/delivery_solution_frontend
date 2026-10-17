@@ -1,6 +1,7 @@
 import { z } from 'zod'
+import { FIELD_LIMITS } from '@/lib/constants'
 
-const NAME_MAX = 150
+const NAME_MAX = FIELD_LIMITS.customer.name
 
 /**
  * Built fresh per mode rather than derived with `.min(0)`: in Zod v4 string
@@ -16,9 +17,27 @@ const name = (isEditing: boolean) =>
         .max(NAME_MAX, `Name must be at most ${NAME_MAX} characters`)
 
 const customerOptionalFields = {
-  phone: z.string().max(50, 'Phone must be at most 50 characters').nullable(),
-  address: z.string().max(500, 'Address must be at most 500 characters').nullable(),
-  notes: z.string().max(500, 'Notes must be at most 500 characters').nullable(),
+  phone: z
+    .string()
+    .max(
+      FIELD_LIMITS.customer.phone,
+      `Phone must be at most ${FIELD_LIMITS.customer.phone} characters`,
+    )
+    .nullable(),
+  address: z
+    .string()
+    .max(
+      FIELD_LIMITS.customer.address,
+      `Address must be at most ${FIELD_LIMITS.customer.address} characters`,
+    )
+    .nullable(),
+  notes: z
+    .string()
+    .max(
+      FIELD_LIMITS.customer.notes,
+      `Notes must be at most ${FIELD_LIMITS.customer.notes} characters`,
+    )
+    .nullable(),
 }
 
 /**

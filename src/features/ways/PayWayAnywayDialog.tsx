@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label'
 import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { wayKeys, type Way } from '@/features/ways/api'
+import { FIELD_LIMITS } from '@/lib/constants'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface PayWayAnywayDialogProps {
@@ -56,7 +57,7 @@ export function PayWayAnywayDialog({ way, onPayAnyway }: PayWayAnywayDialogProps
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="pay-anyway-reason">Reason (required)</Label>
-            <Input id="pay-anyway-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} />
+            <Input id="pay-anyway-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={FIELD_LIMITS.way.payAnywayReason} />
           </div>
           {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
           <DialogFooter>

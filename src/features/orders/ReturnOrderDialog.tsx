@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import type { Order } from '@/features/orders/api'
 import { usePermission } from '@/lib/auth/usePermission'
+import { FIELD_LIMITS } from '@/lib/constants'
 
 interface ReturnOrderDialogProps {
   order: Order | null
@@ -30,7 +31,7 @@ export function ReturnOrderDialog({ order, pending, onClose, onSave }: ReturnOrd
       <DialogContent>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <DialogHeader><DialogTitle>Return goods to shop</DialogTitle><DialogDescription>{order?.trackingCode} will be closed as returned. State why the package is back.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-2"><Label htmlFor="return-reason">Return reason</Label><Input id="return-reason" required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+          <div className="flex flex-col gap-2"><Label htmlFor="return-reason">Return reason</Label><Input id="return-reason" required maxLength={FIELD_LIMITS.order.reason} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
           {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
           <DialogFooter><Button type="button" variant="outline" onClick={onClose}>Keep order</Button>{canUpdateOrder && <Button type="submit" disabled={pending || !reason.trim()}>{pending ? 'Saving…' : 'Mark returned'}</Button>}</DialogFooter>
         </form>

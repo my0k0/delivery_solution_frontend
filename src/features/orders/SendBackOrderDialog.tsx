@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import type { Order } from '@/features/orders/api'
 import { usePermission } from '@/lib/auth/usePermission'
+import { FIELD_LIMITS } from '@/lib/constants'
 
 interface SendBackOrderDialogProps {
   order: Order | null
@@ -31,8 +32,8 @@ export function SendBackOrderDialog({ order, pending, onClose, onSave }: SendBac
       <DialogContent>
         <form className="flex flex-col gap-4" onSubmit={(event) => void submit(event)}>
           <DialogHeader><DialogTitle>Send order back</DialogTitle><DialogDescription>{order?.trackingCode} returns to the rider queue. Keep the shop reason separate from the internal note.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-2"><Label htmlFor="send-back-reason">Reason visible to shop</Label><Input id="send-back-reason" required maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
-          <div className="flex flex-col gap-2"><Label htmlFor="send-back-note">Internal note</Label><Input id="send-back-note" required maxLength={2000} value={internalNote} onChange={(event) => setInternalNote(event.target.value)} /></div>
+          <div className="flex flex-col gap-2"><Label htmlFor="send-back-reason">Reason visible to shop</Label><Input id="send-back-reason" required maxLength={FIELD_LIMITS.order.reason} value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+          <div className="flex flex-col gap-2"><Label htmlFor="send-back-note">Internal note</Label><Input id="send-back-note" required maxLength={FIELD_LIMITS.order.internalNote} value={internalNote} onChange={(event) => setInternalNote(event.target.value)} /></div>
           {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
           <DialogFooter><Button type="button" variant="outline" onClick={onClose}>Keep awaiting approval</Button>{canApproveDelivery && <Button type="submit" disabled={pending || !reason.trim() || !internalNote.trim()}>{pending ? 'Saving…' : 'Send back'}</Button>}</DialogFooter>
         </form>
