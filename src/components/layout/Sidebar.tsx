@@ -33,11 +33,12 @@ function SidebarNavLink({ item }: { item: NavItem }) {
   )
 }
 
+/** Shared by the desktop rail and the mobile drawer; scrolls independently. */
 function SidebarContent() {
   const hasPermission = useAuthStore((state) => state.hasPermission)
   const role = useAuthStore((state) => state.user?.role)
   return (
-    <nav className="flex flex-1 flex-col gap-1 px-2 py-2">
+    <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-2">
       {visibleNavItems(hasPermission, role).map((item) => (
         <SidebarNavLink key={item.to} item={item} />
       ))}
@@ -49,9 +50,10 @@ function SidebarContent() {
 export function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
-      {/* Desktop */}
-      <aside className="hidden w-56 shrink-0 border-r bg-sidebar lg:block">
-        <div className="flex h-14 items-center border-b px-4">
+      {/* Desktop. `lg:flex` (not `lg:block`) so the nav's flex-1 can size it and
+          scroll inside the viewport instead of growing past it. */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r bg-sidebar lg:flex">
+        <div className="flex h-14 shrink-0 items-center border-b px-4">
           <span className="text-base font-semibold tracking-tight">
             Delivery&nbsp;Solution
           </span>
