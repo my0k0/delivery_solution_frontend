@@ -271,3 +271,51 @@ git commit -m "chore: verify frontend covers every live API endpoint"
 **Review Focus:** the five failure modes each have an owning assertion — types freshness (Task 1 Steps 2), no master-data/operations restore (Task 1 Step 3 path list), permission mirror (Task 1 Step 6), single orders implementation (Task 1 Step 3 + Step 7 fix list), `usePermission` re-export (Task 1 Step 5 + Step 7).
 
 **Proportion:** one integration task, two small feature tasks, one audit task — proportional to a merge that touches ~60 files but decides ~6 things.
+
+---
+
+## Outcome (what actually happened)
+
+Executed inline on branch `rebuild/api-compat` (base `9c4cf53`): `82ee591`,
+`8a83341`, `a791e44`, `cf63781`, `7223ba9`. Build green, lint 0 errors,
+33 tests pass, endpoint audit clean.
+
+**Deviations from this plan, and why:**
+
+1. **Tests: none were kept.** This repo forbids new spec files
+   (`CLAUDE.md:26`, `AGENTS.md:8`). This plan prescribed TDD, but a plan is not
+   the explicit user request the rule requires, so the three spec files written
+   under Tasks 2 and 3 were removed. Every behaviour they covered was verified
+   by live probe instead (recorded in the commit bodies).
+2. **Task 2 did not add a fetcher.** `fetchAssignableRiders` /
+   `useAssignableRiders` already existed in `features/riders/api.ts` and were
+   dead after Task 1; the dialog was pointed at those instead of duplicating a
+   function into `orders/api.ts`.
+3. **Task 3 needed no production change.** The plan assumed the shops schema
+   did not require the channel — that was the *other* line's gap. This tree
+   keeps the shops module that already required `channelType`/`channelName`
+   and already sent them, so Task 3 became a regression guard only.
+4. **`@/features/operations/api` was not restored.** The restored modules were
+   repointed to the per-feature APIs; a second hand-typed API layer is what
+   drifted from the live schema in the first place.
+5. **Extra fixes the review turned up**, beyond this plan's scope: riders
+   landing on a deleted `/rider` route after login (main's `LoginPage` hardcoded
+   it), `TownshipsPage` actions gated on `orders.*` instead of `townships.*`,
+   and three dead townships writers in `orders/api.ts`.
+
+**Open items handed back to the user (not fixed here):**
+
+- **Client field limits drift from the API's DTOs** — 15 sites let the user
+  submit values the server rejects with HTTP 400 (e.g. shop `channelName`
+  allows 200, the DTO caps 100; `users.name`/`phone` and `roles.description`
+  have no client cap at all). A further few are stricter than the server.
+- **No township delete UI** — `DELETE /townships/{id}` exists in the API and in
+  the permission catalogue (`townships.delete`) with no frontend caller.
+- **Rider-only pages are visible to office users** — `/rider-dashboard` and
+  `/rider-board` are gated on `deliveries.read`, which OWNER and OFFICER also
+  hold, but `/riders/me/*` returns 403 for non-riders. Office users see two
+  nav items that always error.
+- **`/orders/approval` gate mismatch** — nav gates on `deliveries.approve`, the
+  route on `orders.read`; latent until a custom role holds only one.
+- **`AssignOrderDialog` needs `orders.create`** (via `/riders/assignable`) but
+  opens for `orders.update`, and shows a silently empty picker on 403.
