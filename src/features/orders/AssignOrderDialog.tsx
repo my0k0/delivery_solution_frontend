@@ -6,6 +6,7 @@ import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
 import { useAssignableRiders } from '@/features/riders/api'
 import { fetchDeliveryPartners, type Order } from '@/features/orders/api'
 import { usePermission } from '@/lib/auth/usePermission'
+import { getApiErrorMessage } from '@/lib/api/client'
 
 interface AssignOrderDialogProps {
   order: Order | null
@@ -24,6 +25,16 @@ export function AssignOrderDialog({ order, pending, onClose, onSave }: AssignOrd
   const [message, setMessage] = useState('')
   const riderOptions = (riders.data ?? []).map((rider) => ({ value: rider.id, label: rider.name }))
   const partnerOptions = (partners.data ?? []).filter((partner) => partner.isActive).map((partner) => ({ value: partner.id, label: partner.name }))
+  /**
+   * This dialog opens on `orders.update` and saves through
+   * `POST /orders/{id}/assign` (also `orders.update`), but the two lists need
+   * other grants: `/riders/assignable` requires `orders.create` and
+   * `/delivery-partners` requires `partners.read`. Without this the picker just
+   * renders empty and the user is told to "choose an assignee".
+   */
+  const riderError = riders.isError ? getApiErrorMessage(riders.error) : ''
+  const partnerError = partners.isError ? getApiErrorMessage(partners.error) : ''
+  const listError = assigneeType === 'RIDER' ? riderError : assigneeType === 'PARTNER' ? partnerError : ''
 
   async function submit() {
     if (assigneeType && !assigneeId) {
@@ -47,12 +58,18 @@ export function AssignOrderDialog({ order, pending, onClose, onSave }: AssignOrd
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <OrderSelectField id="assignment-type" label="Assignment" value={assigneeType} options={[{ value: 'RIDER', label: 'Rider' }, { value: 'PARTNER', label: 'Delivery partner' }]} placeholder="Clear assignee" onChange={(value) => { setAssigneeType(value as 'RIDER' | 'PARTNER' | ''); setAssigneeId('') }} />
-          {assigneeType && <OrderSelectField id="assignment-person" label={assigneeType === 'RIDER' ? 'Rider' : 'Delivery partner'} value={assigneeId} options={assigneeType === 'RIDER' ? riderOptions : partnerOptions} onChange={setAssigneeId} />}
+          {assigneeType && !listError && <OrderSelectField id="assignment-person" label={assigneeType === 'RIDER' ? 'Rider' : 'Delivery partner'} value={assigneeId} options={assigneeType === 'RIDER' ? riderOptions : partnerOptions} onChange={setAssigneeId} />}
         </div>
+        {listError && (
+          <p role="alert" className="text-sm text-destructive">
+            {assigneeType === 'RIDER' ? 'Could not load assignable riders. ' : 'Could not load delivery partners. '}
+            {listError}
+          </p>
+        )}
         {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          {canUpdateOrder && <Button type="button" disabled={pending} onClick={() => void submit()}>{pending ? 'Saving…' : assigneeType ? 'Save assignment' : 'Clear assignee'}</Button>}
+          {canUpdateOrder && <Button type="button" disabled={pending || Boolean(listError)} onClick={() => void submit()}>{pending ? 'Saving…' : assigneeType ? 'Save assignment' : 'Clear assignee'}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
