@@ -17,10 +17,19 @@ export function Can({
 }
 
 /** Route-level gate: redirect to /403 when the caller lacks the permission. */
-export function ProtectedRoute({ perm }: { perm: PermissionKey }) {
+export function ProtectedRoute({
+  perm,
+  roles,
+}: {
+  perm: PermissionKey
+  /** Optional role gate, for routes the permission alone does not scope. */
+  roles?: readonly string[]
+}) {
   const location = useLocation()
   const allowed = usePermission(perm)
-  if (!allowed) {
+  const role = useAuthStore((state) => state.user?.role)
+  const roleAllowed = roles === undefined || (role !== undefined && roles.includes(role))
+  if (!allowed || !roleAllowed) {
     return <Navigate to="/403" replace state={{ from: location }} />
   }
   return <Outlet />

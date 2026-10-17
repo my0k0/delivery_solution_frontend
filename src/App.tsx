@@ -56,7 +56,7 @@ function RedirectToFirst() {
   const hasPermission = useAuthStore((state) => state.hasPermission)
   const user = useAuthStore((state) => state.user)
   if (user?.role === 'SHOP') return <Navigate to="/shop" replace />
-  return <Navigate to={firstAllowedPath(hasPermission)} replace />
+  return <Navigate to={firstAllowedPath(hasPermission, user?.role)} replace />
 }
 
 function AppRoutes() {
@@ -89,7 +89,7 @@ function AppRoutes() {
             <Route element={<ProtectedRoute perm="reports.read" />}><Route path="/reports/shop-statement" element={<OfficeShopStatementPage />} /></Route>
             <Route element={<ProtectedRoute perm="reports.read" />}><Route path="/reports/rider-collection" element={<RiderCollectionPage />} /></Route>
             <Route element={<ProtectedRoute perm="reports.read" />}><Route path="/reports/rider-payout" element={<RiderPayoutPage />} /></Route>
-            <Route element={<ProtectedRoute perm="deliveries.read" />}><Route path="/rider-dashboard" element={<RiderDashboardPage />} /></Route>
+            <Route element={<ProtectedRoute perm="deliveries.read" roles={['RIDER']} />}><Route path="/rider-dashboard" element={<RiderDashboardPage />} /></Route>
             <Route element={<ProtectedRoute perm="users.read" />}>
               <Route path="/users" element={<UsersPage />} />
             </Route>
@@ -107,7 +107,7 @@ function AppRoutes() {
             <Route element={<ProtectedRoute perm="orders.read" />}><Route path="/orders/:orderId" element={<OrderDetailPage />} /></Route>
             <Route element={<ProtectedRoute perm="townships.read" />}><Route path="/townships" element={<TownshipsPage />} /></Route>
             <Route element={<ProtectedRoute perm="partners.read" />}><Route path="/partners" element={<DeliveryPartnersPage />} /></Route>
-            <Route element={<ProtectedRoute perm="deliveries.read" />}><Route path="/rider-board" element={<RiderBoardPage />} /></Route>
+            <Route element={<ProtectedRoute perm="deliveries.read" roles={['RIDER']} />}><Route path="/rider-board" element={<RiderBoardPage />} /></Route>
             <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways" element={<WaysPage />} /></Route>
             <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways/settings" element={<CommissionSettingsPage />} /></Route>
             <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways/:wayId" element={<WayDetailPage />} /></Route>

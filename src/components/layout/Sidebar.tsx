@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { cn } from 'cn'
-import { Can } from '@/lib/auth/gate'
-import { NAV_ITEMS, type NavItem } from '@/config/navigation'
+import { useAuthStore } from '@/lib/store/auth.store'
+import { visibleNavItems, type NavItem } from '@/config/navigation'
 import { Button } from '@/components/ui/button'
 
 interface SidebarProps {
@@ -34,17 +34,13 @@ function SidebarNavLink({ item }: { item: NavItem }) {
 }
 
 function SidebarContent() {
+  const hasPermission = useAuthStore((state) => state.hasPermission)
+  const role = useAuthStore((state) => state.user?.role)
   return (
     <nav className="flex flex-1 flex-col gap-1 px-2 py-2">
-      {NAV_ITEMS.map((item) =>
-        item.permission ? (
-          <Can key={item.to} name={item.permission}>
-            <SidebarNavLink item={item} />
-          </Can>
-        ) : (
-          <SidebarNavLink key={item.to} item={item} />
-        ),
-      )}
+      {visibleNavItems(hasPermission, role).map((item) => (
+        <SidebarNavLink key={item.to} item={item} />
+      ))}
     </nav>
   )
 }
