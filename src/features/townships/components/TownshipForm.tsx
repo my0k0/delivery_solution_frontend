@@ -29,6 +29,15 @@ export function TownshipFormFields() {
         error={errors.defaultDeliveryFee?.message}
       />
       <TextField
+        {...register('defaultCommissionFee')}
+        htmlFor="township-default-commission"
+        label="Rider commission"
+        inputMode="decimal"
+        placeholder="e.g. 500 or 500.50"
+        required
+        error={errors.defaultCommissionFee?.message}
+      />
+      <TextField
         {...register('leadTimeDays')}
         htmlFor="township-lead-time"
         label="Lead time (days)"

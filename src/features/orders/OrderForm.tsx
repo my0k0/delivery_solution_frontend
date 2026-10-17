@@ -31,6 +31,7 @@ interface OrderDraft {
   assigneeId: string
   packagePrice: string
   deliveryFee: string
+  commissionFee: string
   isPackagePaidToShop: boolean
   isFeePaidToShop: boolean
   partnerFee: string
@@ -57,6 +58,7 @@ function createDraft(order: Order | null): OrderDraft {
     assigneeId: order?.riderId ?? order?.partnerId ?? '',
     packagePrice: order?.packagePrice ?? '0.00',
     deliveryFee: order?.deliveryFee ?? '0.00',
+    commissionFee: order?.commissionFee ?? '0.00',
     isPackagePaidToShop: order?.isPackagePaidToShop ?? false,
     isFeePaidToShop: order?.isFeePaidToShop ?? false,
     partnerFee: order?.partnerFee ?? '0.00',
@@ -79,6 +81,16 @@ function assigneeFromTownship(township: Township | undefined): Pick<OrderDraft, 
   return { assigneeType: '', assigneeId: '' }
 }
 
+/**
+ * Commission is a rider earning, so a partner-defaulting township contributes
+ * none — the same way it used to contribute no way. Any other township
+ * pre-fills its commission exactly like its delivery fee.
+ */
+function commissionFromTownship(township: Township | undefined): string {
+  if (!township) return '0.00'
+  return township.defaultAssigneeType === 'PARTNER' ? '0.00' : township.defaultCommissionFee
+}
+
 function selectOptions<T extends { id: string; name: string }>(records: T[] | undefined) {
   return (records ?? []).map((record) => ({ value: record.id, label: record.name }))
 }
@@ -89,7 +101,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const townships = useQuery({ queryKey: ['workflow-townships'], queryFn: fetchTownships })
   const riders = useQuery({ queryKey: ['operations', 'riders', 'active'], queryFn: () => fetchRiders({ page: 1, perPage: 100, status: 'ACTIVE' }) })
   const partners = useQuery({ queryKey: ['workflow-partners'], queryFn: fetchDeliveryPartners })
-  const canUpdateCosts = usePermission('orders.update_costs')
   const canUpdateAfterApproval = usePermission('orders.update_after_approval')
   const canCreateOrder = usePermission('orders.create')
   const canUpdateOrder = usePermission('orders.update')
@@ -102,9 +113,15 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const selectedTownship = townships.data?.find((township) => township.id === draft.townshipId)
   const pendingTownship = townships.data?.find((township) => township.id === pendingTownshipId) ?? null
   const isDeliveredOrder = order?.status === 'DELIVERED'
-  const canEditCosts = !order || canUpdateCosts
+  /** Money fields ride on the same grant as any other order edit (`orders.update`). */
+  const canEditCosts = !order || canUpdateOrder
   const canEditApprovedCosts = !isDeliveredOrder || canUpdateAfterApproval
   const costFieldsDisabled = !canEditCosts || !canEditApprovedCosts
+  /**
+   * Commission is a rider earning; a partner order is covered by `partnerFee`
+   * instead, so the field is inert and the backend stores `'0'` either way.
+   */
+  const isPartnerOrder = draft.assigneeType === 'PARTNER'
   const moneyPreview = {
     packagePrice: draft.packagePrice,
     deliveryFee: draft.deliveryFee,
@@ -114,6 +131,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const hasChangedMoneyFields = Boolean(order && (
     order.packagePrice !== draft.packagePrice
     || order.deliveryFee !== draft.deliveryFee
+    || order.commissionFee !== draft.commissionFee
     || order.partnerFee !== (draft.partnerFee || '0.00')
     || order.isPackagePaidToShop !== draft.isPackagePaidToShop
     || order.isFeePaidToShop !== draft.isFeePaidToShop
@@ -141,6 +159,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
     updateDraft({
       townshipId: township.id,
       deliveryFee: township.defaultDeliveryFee,
+      commissionFee: commissionFromTownship(township),
       estimatedDeliveryDate: calculateEstimatedDate(township.leadTimeDays),
       ...assigneeFromTownship(township),
     })
@@ -166,6 +185,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       ...(overwriteDefaults
         ? {
             deliveryFee: pendingTownship.defaultDeliveryFee,
+            commissionFee: commissionFromTownship(pendingTownship),
             ...assigneeFromTownship(pendingTownship),
           }
         : {}),
@@ -175,7 +195,18 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   }
 
   function setAssignee(assigneeType: AssigneeType | '') {
-    updateDraft({ assigneeType, assigneeId: '' })
+    /**
+     * The commission follows the assignee: a partner order has none, and moving
+     * back to a rider re-fills the township prefill — but only while the field
+     * still holds the untouched `0.00`, so a typed value is never clobbered.
+     */
+    updateDraft({
+      assigneeType,
+      assigneeId: '',
+      ...(assigneeType === 'PARTNER'
+        ? { commissionFee: '0.00' }
+        : draft.commissionFee === '0.00' ? { commissionFee: commissionFromTownship(selectedTownship) } : {}),
+    })
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -185,7 +216,11 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       setMessage('Choose both a shop and a customer.')
       return
     }
-    if (!AMOUNT_PATTERN.test(draft.packagePrice) || !AMOUNT_PATTERN.test(draft.deliveryFee)) {
+    if (
+      !AMOUNT_PATTERN.test(draft.packagePrice)
+      || !AMOUNT_PATTERN.test(draft.deliveryFee)
+      || !AMOUNT_PATTERN.test(draft.commissionFee)
+    ) {
       setMessage('Enter amounts with up to two decimal places.')
       return
     }
@@ -200,6 +235,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       townshipId: draft.townshipId || null,
       packagePrice: draft.packagePrice,
       deliveryFee: draft.deliveryFee,
+      commissionFee: draft.commissionFee,
       isPackagePaidToShop: draft.isPackagePaidToShop,
       isFeePaidToShop: draft.isFeePaidToShop,
       partnerFee: draft.partnerFee || '0.00',
@@ -220,21 +256,29 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
         const isAssigneeStillTownshipDefault = draft.assigneeType === townshipDefaultAssignee.assigneeType
           && draft.assigneeId === townshipDefaultAssignee.assigneeId
         const canUseTownshipAssigneeDefault = isTownshipChanged && Boolean(selectedTownship) && isApplyingTownshipDefaults && isAssigneeStillTownshipDefault
-        const canUseTownshipFeeDefault = isTownshipChanged
+        /**
+         * One request means "adopt this township's money defaults", so the gate
+         * covers the fee and the commission together: both must still match the
+         * township, then both are left out for the API's `applyTownshipFee` to
+         * supply. An edited value is sent explicitly instead.
+         */
+        const canUseTownshipMoneyDefault = isTownshipChanged
           && isApplyingTownshipDefaults
           && selectedTownship?.defaultDeliveryFee === draft.deliveryFee
+          && selectedTownship?.defaultCommissionFee === draft.commissionFee
         const updateBody: UpdateOrderBody = {
           ...commonBody,
-          ...(isTownshipChanged && canUseTownshipFeeDefault ? { applyTownshipFee: true } : {}),
-          ...(isTownshipChanged && canUseTownshipAssigneeDefault ? { applyTownshipAssignee: true } : {}),
           ...(!canUseTownshipAssigneeDefault ? assignmentBody : {}),
           ...(isTownshipChanged ? {
-            applyTownshipFee: canUseTownshipFeeDefault,
+            applyTownshipFee: canUseTownshipMoneyDefault,
             applyTownshipAssignee: canUseTownshipAssigneeDefault,
           } : {}),
           ...(isDeliveredOrder && hasChangedMoneyFields ? { reason: draft.reason } : {}),
         }
-        if (canUseTownshipFeeDefault) delete updateBody.deliveryFee
+        if (canUseTownshipMoneyDefault) {
+          delete updateBody.deliveryFee
+          delete updateBody.commissionFee
+        }
         await onSave(updateBody)
         return
       }
@@ -282,6 +326,10 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
             <Input id="order-delivery-fee" inputMode="decimal" value={draft.deliveryFee} disabled={costFieldsDisabled} onChange={(event) => updateDraft({ deliveryFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
+            <Label htmlFor="order-commission-fee">{isPartnerOrder ? 'Rider commission (no partner commission)' : 'Rider commission'}</Label>
+            <Input id="order-commission-fee" inputMode="decimal" value={draft.commissionFee} disabled={costFieldsDisabled || isPartnerOrder} onChange={(event) => updateDraft({ commissionFee: event.target.value })} />
+          </div>
+          <div className="flex flex-col gap-2">
             <Label htmlFor="order-partner-fee">Partner fee (internal)</Label>
             <Input id="order-partner-fee" inputMode="decimal" value={draft.partnerFee} disabled={costFieldsDisabled} onChange={(event) => updateDraft({ partnerFee: event.target.value })} />
           </div>
@@ -322,7 +370,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       <TownshipChangeDialog
         open={pendingTownshipId !== null}
         township={pendingTownship}
-        canApplyDefaults={!order || (pendingTownshipId === '' ? canUpdateOrder : canUpdateCosts && canUpdateAfterApproval)}
+        canApplyDefaults={!order || (pendingTownshipId === '' ? canUpdateOrder : canUpdateOrder && canUpdateAfterApproval)}
         onClose={() => setPendingTownshipId(null)}
         onChoose={confirmTownshipChange}
       />

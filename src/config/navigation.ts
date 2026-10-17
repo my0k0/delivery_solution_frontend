@@ -10,8 +10,6 @@ import {
   ClipboardCheck,
   MapPinned,
   Handshake,
-  Route,
-  Coins,
   LayoutDashboard,
   FileBarChart,
   ClipboardList,
@@ -34,34 +32,92 @@ export interface NavItem {
   roles?: readonly string[];
 }
 
-/** Single source of truth for sidebar + landing redirect. */
-export const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Office dashboard", icon: LayoutDashboard, permission: "reports.read" },
-  { to: "/reports/orders", label: "Order report", icon: FileBarChart, permission: "reports.read" },
-  { to: "/reports/shop-statement", label: "Shop statement", icon: Store, permission: "reports.read" },
-  { to: "/reports/rider-collection", label: "Rider collection", icon: ClipboardList, permission: "reports.read" },
-  { to: "/reports/rider-payout", label: "Rider payout", icon: WalletCards, permission: "reports.read" },
-  { to: "/rider-dashboard", label: "My dashboard", icon: LayoutDashboard, permission: "deliveries.read", roles: ["RIDER"] },
-  { to: "/users", label: "Users", icon: Users, permission: "users.read" },
-  { to: "/roles", label: "Roles", icon: UserCog, permission: "roles.read" },
+/** A labelled set of destinations that the sidebar renders as one section. */
+export interface NavGroup {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+/**
+ * Single source of truth for the sidebar and the landing redirect. Every
+ * destination sits in exactly one group, and group order is sidebar order.
+ *
+ * A group left with fewer than two visible items is rendered by the sidebar as
+ * plain links — there is nothing to collapse — so `settings` needs no special
+ * casing and a group narrowed by permissions degrades on its own.
+ */
+export const NAV_GROUPS: NavGroup[] = [
   {
-    to: "/permissions",
-    label: "Permissions",
-    icon: ShieldCheck,
-    permission: "permissions.read",
+    id: "reports",
+    label: "Reports",
+    items: [
+      { to: "/dashboard", label: "Office dashboard", icon: LayoutDashboard, permission: "reports.read" },
+      { to: "/reports/orders", label: "Order report", icon: FileBarChart, permission: "reports.read" },
+      { to: "/reports/shop-statement", label: "Shop statement", icon: Store, permission: "reports.read" },
+      { to: "/reports/rider-collection", label: "Rider collection", icon: ClipboardList, permission: "reports.read" },
+      { to: "/reports/rider-payout", label: "Rider payout", icon: WalletCards, permission: "reports.read" },
+    ],
   },
-  { to: "/shops", label: "Shops", icon: Store, permission: "shops.read" },
-  { to: "/customers", label: "Customers", icon: Contact, permission: "customers.read" },
-  { to: "/riders", label: "Riders", icon: Bike, permission: "riders.read" },
-  { to: "/orders", label: "Orders", icon: Package, permission: "orders.read" },
-  { to: "/orders/approval", label: "Approval queue", icon: ClipboardCheck, permission: "deliveries.approve" },
-  { to: "/townships", label: "Townships", icon: MapPinned, permission: "townships.read" },
-  { to: "/partners", label: "Delivery partners", icon: Handshake, permission: "partners.read" },
-  { to: "/rider-board", label: "My deliveries", icon: Bike, permission: "deliveries.read", roles: ["RIDER"] },
-  { to: "/ways", label: "Ways", icon: Route, permission: "ways.read" },
-  { to: "/ways/settings", label: "Commission settings", icon: Coins, permission: "ways.read" },
-  { to: "/settings/password", label: "Settings", icon: Settings },
+  {
+    id: "orders",
+    label: "Orders",
+    items: [
+      { to: "/orders", label: "Orders", icon: Package, permission: "orders.read" },
+      { to: "/orders/approval", label: "Approval queue", icon: ClipboardCheck, permission: "deliveries.approve" },
+    ],
+  },
+  {
+    id: "directory",
+    label: "Shops & customers",
+    items: [
+      { to: "/shops", label: "Shops", icon: Store, permission: "shops.read" },
+      { to: "/customers", label: "Customers", icon: Contact, permission: "customers.read" },
+    ],
+  },
+  {
+    id: "delivery-setup",
+    label: "Delivery setup",
+    items: [
+      { to: "/riders", label: "Riders", icon: Bike, permission: "riders.read" },
+      { to: "/townships", label: "Townships", icon: MapPinned, permission: "townships.read" },
+      { to: "/partners", label: "Delivery partners", icon: Handshake, permission: "partners.read" },
+    ],
+  },
+  {
+    id: "administration",
+    label: "Administration",
+    items: [
+      { to: "/users", label: "Users", icon: Users, permission: "users.read" },
+      { to: "/roles", label: "Roles", icon: UserCog, permission: "roles.read" },
+      {
+        to: "/permissions",
+        label: "Permissions",
+        icon: ShieldCheck,
+        permission: "permissions.read",
+      },
+    ],
+  },
+  {
+    id: "my-work",
+    label: "My work",
+    items: [
+      { to: "/rider-dashboard", label: "My dashboard", icon: LayoutDashboard, permission: "deliveries.read", roles: ["RIDER"] },
+      { to: "/rider-board", label: "My deliveries", icon: Bike, permission: "deliveries.read", roles: ["RIDER"] },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    items: [{ to: "/settings/password", label: "Settings", icon: Settings }],
+  },
 ];
+
+/**
+ * Every destination in sidebar order, flattened. Derived from `NAV_GROUPS` —
+ * edit the groups, never this list.
+ */
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
 /**
  * A nav item is visible when the caller's role is allowed and the permission is
@@ -79,13 +135,44 @@ export function isNavItemVisible(
   return !item.permission || hasPermission(item.permission);
 }
 
-export function visibleNavItems(
+/** Groups narrowed to the destinations the caller may open, with empty groups
+ * dropped. A group that survives with one item is rendered as a plain link. */
+export function visibleNavGroups(
   hasPermission: (name: PermissionKey) => boolean,
   role: string | undefined,
-): NavItem[] {
-  return NAV_ITEMS.filter((item) =>
-    isNavItemVisible(item, hasPermission, role),
-  );
+): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) =>
+      isNavItemVisible(item, hasPermission, role),
+    ),
+  })).filter((group) => group.items.length > 0);
+}
+
+/**
+ * The visible group a path belongs to, so the sidebar can open the section
+ * holding the current page. Longest destination wins, so a nested route can
+ * never be attributed to a shorter prefix it merely starts with.
+ */
+export function groupIdForPath(
+  pathname: string,
+  groups: NavGroup[],
+): string | undefined {
+  let match: { id: string; length: number } | undefined;
+  for (const group of groups) {
+    for (const item of group.items) {
+      if (!isPathWithin(pathname, item.to)) continue;
+      if (match === undefined || item.to.length > match.length) {
+        match = { id: group.id, length: item.to.length };
+      }
+    }
+  }
+  return match?.id;
+}
+
+/** Path equality, or a nested path — `/orders` must not match `/orders-archive`. */
+function isPathWithin(pathname: string, destination: string): boolean {
+  return pathname === destination || pathname.startsWith(`${destination}/`);
 }
 
 /**

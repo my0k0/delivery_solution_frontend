@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { approveOrder, fetchOrders, orderKeys, sendBackOrder, type Order, type OrderFilters, type SendBackBody } from '@/features/orders/api'
-import { wayKeys } from '@/features/ways/api'
 import { calculateCodToCollect } from '@/features/orders/money'
 import { ApproveOrderDialog } from '@/features/orders/ApproveOrderDialog'
 import { SendBackOrderDialog } from '@/features/orders/SendBackOrderDialog'
@@ -28,7 +27,6 @@ export function ApprovalQueuePage() {
       setDialog(null)
       setSelectedOrder(null)
       await queryClient.invalidateQueries({ queryKey: orderKeys.all })
-      await queryClient.invalidateQueries({ queryKey: wayKeys.all })
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
   })

@@ -16,6 +16,16 @@ export const townshipSchema = z.object({
     .min(1, 'Delivery fee is required')
     .regex(AMOUNT_PATTERN, 'Enter a valid amount, e.g. 200 or 200.50'),
   /**
+   * Required by `CreateTownshipDto`, mirroring `defaultDeliveryFee`. The rider
+   * commission for an order prefills from here and is paid when the order is
+   * approved as delivered.
+   */
+  defaultCommissionFee: z
+    .string()
+    .trim()
+    .min(1, 'Commission fee is required')
+    .regex(AMOUNT_PATTERN, 'Enter a valid amount, e.g. 500 or 500.50'),
+  /**
    * Required by `CreateTownshipDto` (`@IsInt() @Min(0)`). Kept a string like the
    * money field, so the empty input fails instead of silently becoming `0`; the
    * request body converts with `Number()` at the boundary.

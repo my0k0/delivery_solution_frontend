@@ -42,6 +42,7 @@ export function TownshipDialog({ open, township, onClose }: TownshipDialogProps)
         body: {
           name: values.name,
           defaultDeliveryFee: values.defaultDeliveryFee,
+          defaultCommissionFee: values.defaultCommissionFee,
           leadTimeDays: Number(values.leadTimeDays),
         },
       })
@@ -60,8 +61,8 @@ export function TownshipDialog({ open, township, onClose }: TownshipDialogProps)
             <DialogTitle>{isEditing ? 'Edit township' : 'New township'}</DialogTitle>
             <DialogDescription>
               {isEditing
-                ? 'Update the township name, its default delivery fee and lead time.'
-                : 'Create a delivery area and set its default delivery fee and lead time.'}
+                ? 'Update the township name, its default delivery fee, rider commission and lead time.'
+                : 'Create a delivery area and set its default delivery fee, rider commission and lead time.'}
             </DialogDescription>
           </DialogHeader>
 

@@ -25,7 +25,6 @@ import {
 import { calculateCodToCollect, calculateNetOwedToShop } from '@/features/orders/money'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
-import { wayKeys } from '@/features/ways/api'
 
 const PAGE_SIZE = 20
 
@@ -64,7 +63,6 @@ export function OrdersPage() {
     mutationFn: (body: OrderBody) => createOrder(body),
     onSuccess: async (order) => {
       await queryClient.invalidateQueries({ queryKey: orderKeys.all })
-      await queryClient.invalidateQueries({ queryKey: wayKeys.all })
       setIsFormOpen(false)
       navigate(`/orders/${order.id}`)
     },

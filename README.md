@@ -39,7 +39,7 @@ The Vite server proxies `/api` to the backend. Seed credentials and database set
 pnpm codegen
 ```
 
-`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 14 modules / 69 keys; townships and delivery partners have their own `townships.*` / `partners.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
+`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 13 modules / 42 keys; townships and delivery partners have their own `townships.*` / `partners.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
 
 ## Order workflow
 

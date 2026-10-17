@@ -42,7 +42,7 @@ export function TownshipsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Townships</h1>
-          <p className="text-sm text-muted-foreground">Delivery areas with their default delivery fee and lead time. The fee prefills order entry and can be overridden per order; the lead time sets the order's estimated delivery date.</p>
+          <p className="text-sm text-muted-foreground">Delivery areas with their default delivery fee, rider commission and lead time. Both fees prefill order entry and can be overridden per order; the lead time sets the order's estimated delivery date.</p>
         </div>
         {canCreate && (
           <Button onClick={openCreateDialog}>
@@ -64,6 +64,7 @@ export function TownshipsPage() {
               <TableRow>
                 <TableHead>Township</TableHead>
                 <TableHead>Default delivery fee</TableHead>
+                <TableHead>Rider commission</TableHead>
                 <TableHead>Lead time</TableHead>
                 {(canUpdate || canDelete) && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
@@ -73,6 +74,7 @@ export function TownshipsPage() {
                 <TableRow key={township.id}>
                   <TableCell className="font-medium">{township.name}</TableCell>
                   <TableCell className="font-mono tabular-nums">{formatDecimalAmount(township.defaultDeliveryFee)}</TableCell>
+                  <TableCell className="font-mono tabular-nums">{formatDecimalAmount(township.defaultCommissionFee)}</TableCell>
                   <TableCell className="tabular-nums">{township.leadTimeDays} {township.leadTimeDays === 1 ? 'day' : 'days'}</TableCell>
                   {(canUpdate || canDelete) && (
                     <TableCell className="text-right">

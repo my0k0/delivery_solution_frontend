@@ -29,7 +29,7 @@ export function permissionAction(key: string): string {
 
 /**
  * Build the grid shape. The catalog decides which keys *exist*; `ACTION_ORDER`
- * decides which columns render. A module that doesn't guard `import` gets an
+ * decides which columns render. A module that doesn't guard `approve` gets an
  * inert cell rather than a ragged row — and a backend-added action shows up on
  * its own, because the module set comes from the payload, not a hardcoded list.
  */

@@ -23,9 +23,6 @@ import { ApprovalQueuePage } from '@/features/orders/ApprovalQueuePage'
 import { TownshipsPage } from '@/features/townships/TownshipsPage'
 import { DeliveryPartnersPage } from '@/features/partners/DeliveryPartnersPage'
 import { RiderBoardPage } from '@/features/riders/RiderBoardPage'
-import { WaysPage } from '@/features/ways/WaysPage'
-import { WayDetailPage } from '@/features/ways/WayDetailPage'
-import { CommissionSettingsPage } from '@/features/ways/CommissionSettingsPage'
 import { OfficeDashboardPage } from '@/features/reports/OfficeDashboardPage'
 import { OrdersReportPage } from '@/features/reports/OrdersReportPage'
 import { ShopStatementPage as OfficeShopStatementPage } from '@/features/reports/ShopStatementPage'
@@ -108,9 +105,6 @@ function AppRoutes() {
             <Route element={<ProtectedRoute perm="townships.read" />}><Route path="/townships" element={<TownshipsPage />} /></Route>
             <Route element={<ProtectedRoute perm="partners.read" />}><Route path="/partners" element={<DeliveryPartnersPage />} /></Route>
             <Route element={<ProtectedRoute perm="deliveries.read" roles={['RIDER']} />}><Route path="/rider-board" element={<RiderBoardPage />} /></Route>
-            <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways" element={<WaysPage />} /></Route>
-            <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways/settings" element={<CommissionSettingsPage />} /></Route>
-            <Route element={<ProtectedRoute perm="ways.read" />}><Route path="/ways/:wayId" element={<WayDetailPage />} /></Route>
             <Route path="/settings/password" element={<ChangePasswordPage />} />
             </Route>
           </Route>

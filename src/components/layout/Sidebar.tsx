@@ -1,8 +1,15 @@
-import { NavLink } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
+import { ChevronDown, X } from 'lucide-react'
+import { Accordion } from '@base-ui/react/accordion'
 import { cn } from 'cn'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { visibleNavItems, type NavItem } from '@/config/navigation'
+import {
+  groupIdForPath,
+  visibleNavGroups,
+  type NavGroup,
+  type NavItem,
+} from '@/config/navigation'
 import { Button } from '@/components/ui/button'
 
 interface SidebarProps {
@@ -10,26 +17,67 @@ interface SidebarProps {
   onClose: () => void
 }
 
-function SidebarNavLink({ item }: { item: NavItem }) {
+function SidebarNavLink({ item, nested }: { item: NavItem; nested: boolean }) {
   const Icon = item.icon
-  // All top-level items are exact matches (end) — consistent active state.
+  // All destinations are exact matches (end) — consistent active state.
   return (
     <NavLink
-      key={item.to}
       to={item.to}
       end
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          'flex items-center gap-2 rounded-md py-2 text-sm font-medium transition-colors',
+          nested ? 'pr-3 pl-6' : 'px-3',
           isActive
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         )
       }
     >
-      <Icon className="size-4" />
+      <Icon className="size-4 shrink-0" />
       {item.label}
     </NavLink>
+  )
+}
+
+/**
+ * One sidebar section: a disclosure trigger plus its destinations. A section
+ * with a single destination renders it as a plain link — there is nothing to
+ * collapse, and that is what keeps `settings` from needing a case of its own.
+ */
+function SidebarNavGroup({
+  group,
+  isOpen,
+}: {
+  group: NavGroup
+  isOpen: boolean
+}) {
+  if (group.items.length === 1) {
+    const [onlyItem] = group.items
+    return <SidebarNavLink item={onlyItem} nested={false} />
+  }
+  return (
+    <Accordion.Item value={group.id}>
+      <Accordion.Header className="flex">
+        <Accordion.Trigger className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          {group.label}
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              'ml-auto size-4 shrink-0 transition-transform',
+              isOpen && 'rotate-180',
+            )}
+          />
+        </Accordion.Trigger>
+      </Accordion.Header>
+      <Accordion.Panel className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
+        <div className="flex flex-col gap-1 pt-1">
+          {group.items.map((item) => (
+            <SidebarNavLink key={item.to} item={item} nested />
+          ))}
+        </div>
+      </Accordion.Panel>
+    </Accordion.Item>
   )
 }
 
@@ -37,11 +85,34 @@ function SidebarNavLink({ item }: { item: NavItem }) {
 function SidebarContent() {
   const hasPermission = useAuthStore((state) => state.hasPermission)
   const role = useAuthStore((state) => state.user?.role)
+  const { pathname } = useLocation()
+  const groups = visibleNavGroups(hasPermission, role)
+
+  // Derived-or-own: until the user toggles a section, the one holding the
+  // current route is the open one. Deriving instead of syncing through an
+  // effect also means no render loop, which a fresh array in a dependency
+  // would otherwise cause.
+  const activeGroupId = groupIdForPath(pathname, groups)
+  const [toggledGroupIds, setToggledGroupIds] = useState<string[] | null>(null)
+  const openGroupIds =
+    toggledGroupIds ?? (activeGroupId === undefined ? [] : [activeGroupId])
+
   return (
-    <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 py-2">
-      {visibleNavItems(hasPermission, role).map((item) => (
-        <SidebarNavLink key={item.to} item={item} />
-      ))}
+    <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-2">
+      <Accordion.Root
+        multiple
+        value={openGroupIds}
+        onValueChange={(value: string[]) => setToggledGroupIds(value)}
+        className="flex flex-col gap-1"
+      >
+        {groups.map((group) => (
+          <SidebarNavGroup
+            key={group.id}
+            group={group}
+            isOpen={openGroupIds.includes(group.id)}
+          />
+        ))}
+      </Accordion.Root>
     </nav>
   )
 }

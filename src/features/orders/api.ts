@@ -119,13 +119,11 @@ export type AssignBody = Omit<components['schemas']['AssignOrderDto'], 'riderId'
 }
 
 type GeneratedRiderBoardOrder = components['schemas']['RiderOrderResponseDto']
-export type RiderBoardOrder = Omit<GeneratedRiderBoardOrder, 'customerPhone' | 'customerAddress' | 'townshipName' | 'notes' | 'wayId' | 'wayLabel'> & {
+export type RiderBoardOrder = Omit<GeneratedRiderBoardOrder, 'customerPhone' | 'customerAddress' | 'townshipName' | 'notes'> & {
   customerPhone: string | null
   customerAddress: string | null
   townshipName: string | null
   notes: string | null
-  wayId: string | null
-  wayLabel: string | null
 }
 
 export type RiderBoardResponse = RiderBoardOrder[]

@@ -38,7 +38,6 @@ import { CancelOrderDialog } from '@/features/orders/CancelOrderDialog'
 import { SendBackOrderDialog } from '@/features/orders/SendBackOrderDialog'
 import { ApproveOrderDialog } from '@/features/orders/ApproveOrderDialog'
 import { MarkDeliveredDialog } from '@/features/orders/MarkDeliveredDialog'
-import { fetchWay, wayKeys } from '@/features/ways/api'
 
 type OrderAction =
   | { type: 'assign'; body: AssignBody }
@@ -69,15 +68,9 @@ export function OrderDetailPage() {
   const canUpdate = usePermission('orders.update')
   const canCancel = usePermission('orders.cancel')
   const canApprove = usePermission('deliveries.approve')
-  const canReadWays = usePermission('ways.read')
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [activeDialog, setActiveDialog] = useState<'assign' | 'postpone' | 'cancel' | 'send-back' | 'approve' | 'mark-delivered' | null>(null)
   const orderQuery = useQuery({ queryKey: orderKeys.detail(orderId), queryFn: () => fetchOrder(orderId), enabled: Boolean(orderId) })
-  const wayQuery = useQuery({
-    queryKey: wayKeys.detail(orderQuery.data?.wayId ?? ''),
-    queryFn: () => fetchWay(orderQuery.data?.wayId ?? ''),
-    enabled: Boolean(canReadWays && orderQuery.data?.wayId),
-  })
   const auditQuery = useQuery({ queryKey: orderKeys.audit(orderId), queryFn: () => fetchOrderAudit(orderId), enabled: Boolean(orderId) })
   const shops = useShops({ page: 1, perPage: 100 })
   const customers = useCustomers({ page: 1, perPage: 100 })
@@ -110,7 +103,6 @@ export function OrderDetailPage() {
         queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) }),
         queryClient.invalidateQueries({ queryKey: orderKeys.audit(orderId) }),
         queryClient.invalidateQueries({ queryKey: orderKeys.riderBoard }),
-        queryClient.invalidateQueries({ queryKey: wayKeys.all }),
       ])
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
@@ -164,7 +156,7 @@ export function OrderDetailPage() {
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Customer</p><p className="mt-1 font-medium">{customerName}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Township</p><p className="mt-1 font-medium">{townshipName}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Assignee</p><p className="mt-1 font-medium">{formatAssignee(order, riderRecords, partnerRecords)}</p></div>
-        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivery way</p><p className="mt-1 font-medium">{order.assigneeType === 'PARTNER' ? 'Partner delivery · no way' : order.wayId ? canReadWays && wayQuery.data ? <Link to={`/ways/${wayQuery.data.id}`} className="underline-offset-4 hover:underline">{wayQuery.data.wayDate} · {wayQuery.data.riderName}</Link> : canReadWays ? 'Loading way…' : 'Assigned to a way' : 'Not assigned to a way'}</p></div>
+        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Rider commission</p><p className="mt-1 font-mono">{order.assigneeType === 'PARTNER' ? 'Partner delivery · no commission' : order.commissionFee}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Package price</p><p className="mt-1 font-mono">{order.packagePrice}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivery fee</p><p className="mt-1 font-mono">{order.deliveryFee}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">COD to collect</p><p className="mt-1 font-mono font-semibold">{calculateCodToCollect(order)}</p></div>

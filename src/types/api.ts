@@ -505,104 +505,6 @@ export interface paths {
         patch: operations["OrdersController_update_v1"];
         trace?: never;
     };
-    "/api/v1/ways": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List rider ways with date and derived-state filters */
-        get: operations["WaysController_list_v1"];
-        put?: never;
-        /** Close the rider’s current way today and start a new one */
-        post: operations["WaysController_create_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ways/settings/commission-per-way": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["WaysController_getCommissionRate_v1"];
-        put: operations["WaysController_updateCommissionRate_v1"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ways/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["WaysController_get_v1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ways/{id}/close": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["WaysController_close_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ways/{id}/move-orders": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["WaysController_moveOrders_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/ways/{id}/pay-anyway": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["WaysController_payAnyway_v1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/townships": {
         parameters: {
             query?: never;
@@ -776,7 +678,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get rider payout by way state */
+        /** Get rider payout by delivered order */
         get: operations["ReportsController_getRiderPayout_v1"];
         put?: never;
         post?: never;
@@ -1246,10 +1148,6 @@ export interface components {
             codToCollect: string;
             /** @enum {string} */
             status: "ASSIGNED";
-            /** Format: uuid */
-            wayId: Record<string, never> | null;
-            /** @example 2026-10-16 · 1 */
-            wayLabel: Record<string, never> | null;
         };
         /** @enum {string} */
         OrderStatus: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
@@ -1277,8 +1175,6 @@ export interface components {
             /** @example 09123456789 */
             phone?: Record<string, never> | null;
             status: components["schemas"]["UserStatus"];
-            /** @example 600.00 */
-            commissionPerWayOverride?: Record<string, never> | null;
             vehicleType: components["schemas"]["RiderVehicleType"];
             /** @example MDY-1234 */
             vehiclePlate?: Record<string, never> | null;
@@ -1347,8 +1243,6 @@ export interface components {
             status?: "ACTIVE" | "INACTIVE";
             /** @description Reset rider password */
             password?: string;
-            /** @example 600.00 */
-            commissionPerWayOverride?: Record<string, never> | null;
             /**
              * @default BIKE
              * @enum {string}
@@ -1374,8 +1268,6 @@ export interface components {
             /** @enum {string|null} */
             assigneeType?: "RIDER" | "PARTNER" | null;
             riderId?: Record<string, never> | null;
-            /** Format: uuid */
-            wayId?: Record<string, never> | null;
             partnerId?: Record<string, never> | null;
             partnerTrackingNo?: Record<string, never> | null;
             packageInfo?: Record<string, never> | null;
@@ -1389,6 +1281,11 @@ export interface components {
              * @example 3500.00
              */
             deliveryFee: string;
+            /**
+             * @description Rider commission for this order; not exposed to shop users
+             * @example 500.00
+             */
+            commissionFee: string;
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @description Internal partner cost; not exposed to shop users */
@@ -1439,6 +1336,11 @@ export interface components {
              * @example 3500.00
              */
             deliveryFee?: string;
+            /**
+             * @description Rider commission for this order; overrides the township default
+             * @example 500.00
+             */
+            commissionFee?: string;
             /** @default false */
             isPackagePaidToShop: boolean;
             /** @default false */
@@ -1506,6 +1408,8 @@ export interface components {
             packageInfo?: Record<string, never> | null;
             packagePrice?: string;
             deliveryFee?: string;
+            /** @description Rider commission for this order; overrides the township default */
+            commissionFee?: string;
             isPackagePaidToShop?: boolean;
             isFeePaidToShop?: boolean;
             partnerFee?: string;
@@ -1528,8 +1432,6 @@ export interface components {
             /** @enum {string|null} */
             assigneeType?: "RIDER" | "PARTNER" | null;
             riderId?: Record<string, never> | null;
-            /** Format: uuid */
-            wayId?: Record<string, never> | null;
             partnerId?: Record<string, never> | null;
             partnerTrackingNo?: Record<string, never> | null;
             packageInfo?: Record<string, never> | null;
@@ -1543,6 +1445,11 @@ export interface components {
              * @example 3500.00
              */
             deliveryFee: string;
+            /**
+             * @description Rider commission for this order; not exposed to shop users
+             * @example 500.00
+             */
+            commissionFee: string;
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @description Internal partner cost; not exposed to shop users */
@@ -1558,125 +1465,11 @@ export interface components {
             updatedAt: string;
             history: components["schemas"]["OrderHistoryResponseDto"][];
         };
-        WayResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            riderId: string;
-            riderName: string;
-            /**
-             * Format: date
-             * @example 2026-10-16
-             */
-            wayDate: string;
-            /** @example 1 */
-            sequence: number;
-            /** @example 500.00 */
-            commissionRate: string;
-            isOpen: boolean;
-            /** @enum {string} */
-            state: "EMPTY" | "PENDING_APPROVAL" | "EARNED" | "PAID_ANYWAY";
-            orderCount: number;
-            /** @example 500.00 */
-            commissionAmount: string;
-            /** @example 0.00 */
-            pendingAmount: string;
-            isPaidWithoutDelivery: boolean;
-            payAnywayReason: Record<string, never> | null;
-            /** Format: uuid */
-            payAnywayBy: Record<string, never> | null;
-            /** Format: date-time */
-            payAnywayAt: Record<string, never> | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        CommissionRateResponseDto: {
-            /** @example commissionPerWay */
-            key: string;
-            /** @example 500.00 */
-            value: string;
-        };
-        UpdateCommissionRateDto: {
-            /** @example 500.00 */
-            value: string;
-        };
-        CreateWayDto: {
-            /** Format: uuid */
-            riderId: string;
-        };
-        WayOrderResponseDto: {
-            /** Format: uuid */
-            id: string;
-            trackingCode: string;
-            /** @enum {string} */
-            status: "PENDING" | "ASSIGNED" | "AWAITING_APPROVAL" | "DELIVERED" | "CANCELLED";
-            /** Format: uuid */
-            wayId: Record<string, never> | null;
-            /** Format: uuid */
-            riderId: Record<string, never> | null;
-            /** Format: uuid */
-            partnerId: Record<string, never> | null;
-            /** @example 47000.00 */
-            packagePrice: string;
-            /** @example 3500.00 */
-            deliveryFee: string;
-            /** @example 0.00 */
-            partnerFee: string;
-            /** Format: date-time */
-            deliveredAt: Record<string, never> | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        WayDetailResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            riderId: string;
-            riderName: string;
-            /**
-             * Format: date
-             * @example 2026-10-16
-             */
-            wayDate: string;
-            /** @example 1 */
-            sequence: number;
-            /** @example 500.00 */
-            commissionRate: string;
-            isOpen: boolean;
-            /** @enum {string} */
-            state: "EMPTY" | "PENDING_APPROVAL" | "EARNED" | "PAID_ANYWAY";
-            orderCount: number;
-            /** @example 500.00 */
-            commissionAmount: string;
-            /** @example 0.00 */
-            pendingAmount: string;
-            isPaidWithoutDelivery: boolean;
-            payAnywayReason: Record<string, never> | null;
-            /** Format: uuid */
-            payAnywayBy: Record<string, never> | null;
-            /** Format: date-time */
-            payAnywayAt: Record<string, never> | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            orders: components["schemas"]["WayOrderResponseDto"][];
-        };
-        MoveWayOrdersDto: {
-            orderIds: string[];
-            /** Format: uuid */
-            targetWayId: string;
-        };
-        PayWayAnywayDto: {
-            /** @example Customer package was lost before delivery */
-            reason: string;
-        };
         TownshipResponseDto: {
             id: string;
             name: string;
             defaultDeliveryFee: string;
+            defaultCommissionFee: string;
             leadTimeDays: number;
             defaultAssigneeType?: Record<string, never> | null;
             defaultRiderId?: Record<string, never> | null;
@@ -1688,6 +1481,8 @@ export interface components {
             name: string;
             /** @example 3500.00 */
             defaultDeliveryFee: string;
+            /** @example 500.00 */
+            defaultCommissionFee: string;
             leadTimeDays: number;
             /** @enum {string|null} */
             defaultAssigneeType?: "RIDER" | "PARTNER" | null;
@@ -1697,6 +1492,7 @@ export interface components {
         UpdateTownshipDto: {
             name?: string;
             defaultDeliveryFee?: string;
+            defaultCommissionFee?: string;
             leadTimeDays?: number;
             /** @enum {string|null} */
             defaultAssigneeType?: "RIDER" | "PARTNER" | null;
@@ -1808,27 +1604,16 @@ export interface components {
         RiderPayoutRowDto: {
             riderId: string;
             riderName: string;
-            date: string;
-            wayCount: number;
-            rateTotal: string;
-            earnedCount: number;
+            deliveredOrderCount: number;
             earnedAmount: string;
-            pendingApprovalCount: number;
+            pendingApprovalOrderCount: number;
             pendingApprovalAmount: string;
-            paidAnywayCount: number;
-            paidAnywayAmount: string;
-            overrideWayCount: number;
         };
         RiderPayoutTotalsDto: {
-            wayCount: number;
-            rateTotal: string;
-            earnedCount: number;
+            deliveredOrderCount: number;
             earnedAmount: string;
-            pendingApprovalCount: number;
+            pendingApprovalOrderCount: number;
             pendingApprovalAmount: string;
-            paidAnywayCount: number;
-            paidAnywayAmount: string;
-            overrideWayCount: number;
         };
         RiderPayoutResponseDto: {
             data: components["schemas"]["RiderPayoutRowDto"][];
@@ -1874,19 +1659,18 @@ export interface components {
             townshipSuccessRates: components["schemas"]["TownshipSuccessRateDto"][];
             averagePendingAgeDays: string;
         };
-        OrdersPerWayDto: {
-            wayId: string;
+        OrdersPerDayDto: {
             date: string;
             orderCount: number;
         };
         RiderDashboardResponseDto: {
             today: string;
-            todayWayCount: number;
-            weekWayCount: number;
-            monthWayCount: number;
+            todayDeliveredCount: number;
+            weekDeliveredCount: number;
+            monthDeliveredCount: number;
             commissionEarned: string;
             commissionPending: string;
-            ordersPerWay: components["schemas"]["OrdersPerWayDto"][];
+            ordersPerDay: components["schemas"]["OrdersPerDayDto"][];
             codToHandBack: string;
         };
         ShopOrderListItemDto: {
@@ -3049,187 +2833,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_list_v1: {
-        parameters: {
-            query?: {
-                riderId?: string;
-                dateFrom?: string;
-                dateTo?: string;
-                state?: "EMPTY" | "PENDING_APPROVAL" | "EARNED" | "PAID_ANYWAY";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayResponseDto"][];
-                };
-            };
-        };
-    };
-    WaysController_create_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateWayDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_getCommissionRate_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommissionRateResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_updateCommissionRate_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateCommissionRateDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommissionRateResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_get_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayDetailResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_close_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_moveOrders_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MoveWayOrdersDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayDetailResponseDto"];
-                };
-            };
-        };
-    };
-    WaysController_payAnyway_v1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PayWayAnywayDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WayResponseDto"];
                 };
             };
         };

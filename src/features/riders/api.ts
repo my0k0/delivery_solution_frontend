@@ -36,7 +36,6 @@ export interface UpdateRiderBody {
   name?: string
   phone?: string | null
   status?: UserStatusValue
-  commissionPerWayOverride?: string | null
   licenseNo?: string | null
   vehicleType?: RiderVehicleType
   vehiclePlate?: string | null
