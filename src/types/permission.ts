@@ -22,6 +22,7 @@ export const MODULE_ACTIONS = {
     'update',
     'cancel',
     'update_after_approval',
+    'shop_settlement',
   ],
   deliveries: ['read', 'update', 'approve'],
   townships: ['create', 'read', 'update', 'delete'],
@@ -49,6 +50,7 @@ export const ACTION_ORDER = [
   'approve',
   'cancel',
   'update_after_approval',
+  'shop_settlement',
 ] as const
 
 export type ActionName = (typeof ACTION_ORDER)[number]

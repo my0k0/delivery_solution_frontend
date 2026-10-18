@@ -23,11 +23,20 @@ export function calculateCodToCollect(order: Pick<Order, 'packagePrice' | 'deliv
   return fromMinorUnits(packageAmount + deliveryAmount)
 }
 
-export function calculateNetOwedToShop(order: Pick<Order, 'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop'>): string {
+export function calculateNetOwedToShop(order: Pick<Order, 'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop' | 'shopAdvanceAmount'>): string {
   const packageAmount = order.isPackagePaidToShop ? 0n : toMinorUnits(order.packagePrice)
   const deliveryAmount = order.isFeePaidToShop ? toMinorUnits(order.deliveryFee) : 0n
-  return fromMinorUnits(packageAmount - deliveryAmount)
+  return fromMinorUnits(packageAmount - deliveryAmount - toMinorUnits(order.shopAdvanceAmount))
 }
+
+/**
+ * `calculateNetOwedToShop` returns a negative number whenever the shop holds
+ * company money — it collected the delivery fee, or the order was advanced and
+ * then cancelled. Shown wherever the figure is printed bare, so a minus sign is
+ * never read as a data error.
+ */
+export const NET_OWED_SIGN_NOTE =
+  'Net owed to shop can be negative: positive means the company owes the shop; negative means the shop owes the company.'
 
 export function calculateEstimatedDate(leadTimeDays: number, startingDate = new Date()): string {
   const estimatedDate = new Date(startingDate)

@@ -23,7 +23,7 @@ export function OrderFormDialog({ order, open, pending, onClose, onSave }: Order
         <DialogHeader>
           <DialogTitle>{order ? `Edit ${order.trackingCode}` : 'Create order'}</DialogTitle>
           <DialogDescription>
-            {order ? 'Every saved field change is recorded in the order audit.' : 'Township defaults prefill the fee, assignee, and estimated date.'}
+            {order ? 'Every saved field change is recorded in the order audit.' : 'Township defaults prefill the delivery fee, rider commission, and estimated date. The assignee is chosen explicitly.'}
           </DialogDescription>
         </DialogHeader>
         <OrderForm key={order?.id ?? 'new-order'} order={order} pending={pending} onCancel={onClose} onSave={onSave} />

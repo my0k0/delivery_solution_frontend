@@ -3,7 +3,7 @@
 **Date:** 2026-10-18
 **Repos:** `delivery_solution_api` (NestJS, Drizzle, Postgres), `delivery_solution_frontend` (Vite + React + TS)
 **Companion:** `docs/business-flows.md` describes the system as it is today. This document describes one addition to it.
-**Status:** designed, **not built**. Nothing here has been implemented.
+**Status:** Phase 1 (§7) is **built and verified** (2026-10-18) — `docs/business-flows.md` §8 records the as-built money rules. Phase 2 (§8) is designed and **not built**.
 
 ---
 
@@ -49,6 +49,7 @@ Because the second direction is missing, nobody can answer *"which orders for th
 
 - No general ledger, double-entry accounting, or bank reconciliation. v2 §2 decision 22 keeps Phase 6 **blocked**; this design does not open it.
 - No partial customer payments.
+- **No payment-proof image upload.** An advance is a money fact, not a document store. If proof is ever required it belongs on a separate `reclaim_settlements` log row (§11), never as a column on `orders`.
 - No multi-currency, no payment gateway, no invoicing.
 - No reopening of the `CANCELLED`/`RETURNED` merge (v2 §2 decision 4).
 
@@ -113,8 +114,8 @@ Because `CANCELLED` already contributes `0` to every payable expression, this ne
 
 | Endpoint | Body | Effect | Permission |
 |---|---|---|---|
-| `POST /orders/:id/shop-advance` | — | Sets `shop_advance_amount = packagePrice` (snapshot) and `shop_advanced_at = now()` | `orders.shop_settlement` |
-| `DELETE /orders/:id/shop-advance` | — | Clears both (correcting a mistake) | `orders.shop_settlement` |
+| `POST /orders/:id/shop-advance` | `{ reason?: string }` | Sets `shop_advance_amount = packagePrice` (snapshot) and `shop_advanced_at = now()` | `orders.shop_settlement` |
+| `DELETE /orders/:id/shop-advance` | `{ reason?: string }` | Clears both (correcting a mistake) | `orders.shop_settlement` |
 
 - **No `amount` in the body.** Rule 4 fixes the advance at the package price, and anti-goal §5 forbids an override. The value is read from the order and snapshotted server-side.
 - Both write `order_field_audit` rows, and the new column is treated as a **money field** for audit serialisation (decimal-string-preserving).
@@ -146,8 +147,8 @@ Mirror the key in the frontend's `types/permission.ts`.
 
 ### 7.6 Frontend surfaces
 
-- **Order detail** — an "Advance to shop" block showing the amount, when, and by whom, with the record / undo action, gated on `orders.shop_settlement`. A customer-prepaid order shows why no advance applies rather than a dead button.
-- **Orders list** — a filter for advance state (and customer-prepaid); no column changes required.
+- **Order detail** — an "Advance to shop" block showing the **amount and when** (as built; the acting user is *not* shown — see §11), with the record / undo action, gated on `orders.shop_settlement`. The block itself is **read-only visible to anyone with `orders.read`**; only the record / undo action needs `orders.shop_settlement`. A customer-prepaid order shows why no advance applies rather than a dead button.
+- **Orders list** — a filter for advance state (and customer-prepaid); no column changes required. Same rule: the filters are visible with `orders.read`.
 
 ---
 
@@ -236,4 +237,6 @@ This is the **original motivating scenario**, so Phase 1 must not be read as "re
 - A **self-referential guard now for a Phase 2 rule** — refusing to erase an advance on a cancelled order costs nothing today and prevents Phase 2 from inheriting an unsolvable hole.
 - **One** new permission key, and **no new seed role**.
 - **Filters on the existing orders endpoint** rather than a new report endpoint.
+- **No payment-proof upload, and its shape if one is ever required.** A photo or screenshot of a transfer adds a retention/PII surface for no reconciliation gain — the advance is a money fact, and the audit trail already records *that* and *when*. So neither phase stores a file. If proof is ever demanded, it belongs on a **separate `reclaim_settlements` log row** (a table that does not exist yet), **not** a column on `orders`, keeping the order row a money fact; uploadable by **office users only**; and the **shop portal must never display the file** (it shows obligation/settled state instead). Decide this alongside Phase 6 (§4, first permanent non-goal).
+- **`actorName` on the advance read is a logged follow-up, not built.** The audit rows record the acting user, but the settle response exposes no name, and the detail block shows the amount and when only. Add it if a surface ever needs "who advanced this money".
 - The reclaim is **derived** every time, never stored.

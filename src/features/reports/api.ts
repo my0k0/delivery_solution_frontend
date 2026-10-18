@@ -15,7 +15,7 @@ export type OfficeDashboardQuery = operations['ReportsController_getOfficeDashbo
 
 export type OrderReport = components['schemas']['OrderReportResponseDto']
 export type OrderReportRow = components['schemas']['OrderReportRowDto']
-export type ShopStatement = components['schemas']['ShopStatementResponseDto']
+export type ShopStatement = components['schemas']['OfficeShopStatementResponseDto']
 export type RiderCollectionReport = components['schemas']['RiderCollectionResponseDto']
 export type RiderPayoutReport = components['schemas']['RiderPayoutResponseDto']
 export type OfficeDashboard = components['schemas']['OfficeDashboardResponseDto']

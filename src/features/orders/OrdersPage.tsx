@@ -21,12 +21,24 @@ import {
   type OrderDateBasis,
   type OrderFilters,
   type OrderStatus,
+  type ShopAdvanceFilter,
 } from '@/features/orders/api'
-import { calculateCodToCollect, calculateNetOwedToShop } from '@/features/orders/money'
+import { calculateCodToCollect, calculateNetOwedToShop, NET_OWED_SIGN_NOTE } from '@/features/orders/money'
+import { getTodayDate } from '@/features/reports/date-range'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
 
 const PAGE_SIZE = 20
+
+const SHOP_ADVANCE_FILTER_OPTIONS: Array<{ value: ShopAdvanceFilter; label: string }> = [
+  { value: 'NOT_ADVANCED', label: 'Advance still due' },
+  { value: 'ADVANCED', label: 'Advanced' },
+]
+
+const PACKAGE_PAYMENT_FILTER_OPTIONS = [
+  { value: 'false', label: 'Customer did not pay the shop' },
+  { value: 'true', label: 'Customer paid the shop' },
+]
 
 export function OrdersPage() {
   const canCreate = usePermission('orders.create')
@@ -37,8 +49,11 @@ export function OrdersPage() {
   const [shopId, setShopId] = useState('')
   const [townshipId, setTownshipId] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
-  const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().slice(0, 10))
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [shopAdvance, setShopAdvance] = useState('')
+  const [isPackagePaidToShop, setIsPackagePaidToShop] = useState('')
+  /** Local calendar date, not the UTC one: `toISOString()` reports yesterday's date for a Yangon morning. */
+  const [dateFrom, setDateFrom] = useState(() => getTodayDate())
+  const [dateTo, setDateTo] = useState(() => getTodayDate())
   const [dateBasis, setDateBasis] = useState<OrderDateBasis>('ENTRY')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -54,6 +69,8 @@ export function OrdersPage() {
     shopId: shopId || undefined,
     townshipId: townshipId || undefined,
     assigneeId: assigneeId || undefined,
+    shopAdvance: shopAdvance ? (shopAdvance as ShopAdvanceFilter) : undefined,
+    isPackagePaidToShop: isPackagePaidToShop === '' ? undefined : isPackagePaidToShop === 'true',
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     dateBasis,
@@ -98,6 +115,8 @@ export function OrdersPage() {
         <OrderSelectField id="order-filter-shop" label="Shop" value={shopId} options={(shops.data?.data ?? []).map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="All shops" onChange={(value) => resetToFirstPage(() => setShopId(value))} />
         <OrderSelectField id="order-filter-township" label="Township" value={townshipId} options={(townships.data ?? []).map((township) => ({ value: township.id, label: township.name }))} placeholder="All townships" onChange={(value) => resetToFirstPage(() => setTownshipId(value))} />
         <OrderSelectField id="order-filter-assignee" label="Assignee" value={assigneeId} options={assigneeOptions} placeholder="All assignees" onChange={(value) => resetToFirstPage(() => setAssigneeId(value))} />
+        <OrderSelectField id="order-filter-shop-advance" label="Shop advance" value={shopAdvance} options={SHOP_ADVANCE_FILTER_OPTIONS} placeholder="Any advance state" onChange={(value) => resetToFirstPage(() => setShopAdvance(value))} />
+        <OrderSelectField id="order-filter-package-payment" label="Package payment" value={isPackagePaidToShop} options={PACKAGE_PAYMENT_FILTER_OPTIONS} placeholder="Any package payment" onChange={(value) => resetToFirstPage(() => setIsPackagePaidToShop(value))} />
         <OrderSelectField id="order-date-basis" label="Date basis" value={dateBasis} options={[{ value: 'ENTRY', label: 'Entry date' }, { value: 'DELIVERED', label: 'Delivered date' }]} onChange={(value) => resetToFirstPage(() => setDateBasis(value as OrderDateBasis))} />
         <div className="flex flex-col gap-2">
           <label htmlFor="order-date-from" className="text-sm font-medium">From</label>
@@ -120,7 +139,7 @@ export function OrdersPage() {
           <div className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right">Net owed to shop (estimated)</TableHead>
+                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right" title={NET_OWED_SIGN_NOTE}>Net owed to shop (estimated)</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {orders.data.data.map((order) => (
@@ -136,6 +155,7 @@ export function OrdersPage() {
               </TableBody>
             </Table>
           </div>
+          <p className="text-xs text-muted-foreground">{NET_OWED_SIGN_NOTE}</p>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>{orders.data.meta.total} orders · Page {orders.data.meta.page} of {Math.max(orders.data.meta.totalPages, 1)}</span>
             <div className="flex gap-2">

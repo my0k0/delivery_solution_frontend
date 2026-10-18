@@ -12,10 +12,9 @@ import {
   type DeliveryPartner,
   type Order,
   type OrderBody,
-  type Township,
   type UpdateOrderBody,
 } from '@/features/orders/api'
-import { calculateCodToCollect, calculateEstimatedDate, calculateNetOwedToShop } from '@/features/orders/money'
+import { calculateCodToCollect, calculateEstimatedDate, calculateNetOwedToShop, NET_OWED_SIGN_NOTE } from '@/features/orders/money'
 import { usePermission } from '@/lib/auth/usePermission'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { AMOUNT_PATTERN, FIELD_LIMITS } from '@/lib/constants'
@@ -70,27 +69,6 @@ function createDraft(order: Order | null): OrderDraft {
   }
 }
 
-function assigneeFromTownship(township: Township | undefined): Pick<OrderDraft, 'assigneeType' | 'assigneeId'> {
-  if (!township) return { assigneeType: '', assigneeId: '' }
-  if (township.defaultAssigneeType === 'RIDER') {
-    return { assigneeType: 'RIDER', assigneeId: township.defaultRiderId ?? '' }
-  }
-  if (township.defaultAssigneeType === 'PARTNER') {
-    return { assigneeType: 'PARTNER', assigneeId: township.defaultPartnerId ?? '' }
-  }
-  return { assigneeType: '', assigneeId: '' }
-}
-
-/**
- * Commission is a rider earning, so a partner-defaulting township contributes
- * none — the same way it used to contribute no way. Any other township
- * pre-fills its commission exactly like its delivery fee.
- */
-function commissionFromTownship(township: Township | undefined): string {
-  if (!township) return '0.00'
-  return township.defaultAssigneeType === 'PARTNER' ? '0.00' : township.defaultCommissionFee
-}
-
 function selectOptions<T extends { id: string; name: string }>(records: T[] | undefined) {
   return (records ?? []).map((record) => ({ value: record.id, label: record.name }))
 }
@@ -118,8 +96,10 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const canEditApprovedCosts = !isDeliveredOrder || canUpdateAfterApproval
   const costFieldsDisabled = !canEditCosts || !canEditApprovedCosts
   /**
-   * Commission is a rider earning; a partner order is covered by `partnerFee`
-   * instead, so the field is inert and the backend stores `'0'` either way.
+   * The assignee type decides which money fields apply. Commission is a rider
+   * earning, so it is inert and the backend stores `'0'` for a partner order;
+   * `partnerFee` and `partnerTrackingNo` are the mirror image and are inert
+   * without a partner assignee.
    */
   const isPartnerOrder = draft.assigneeType === 'PARTNER'
   const moneyPreview = {
@@ -127,6 +107,12 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
     deliveryFee: draft.deliveryFee,
     isPackagePaidToShop: draft.isPackagePaidToShop,
     isFeePaidToShop: draft.isFeePaidToShop,
+    /**
+     * An advance is never editable in this form — it is recorded and cleared
+     * from the order detail page — so the preview carries whatever is already
+     * recorded, and `'0'` for an order that has none.
+     */
+    shopAdvanceAmount: order?.shopAdvanceAmount ?? '0',
   }
   const hasChangedMoneyFields = Boolean(order && (
     order.packagePrice !== draft.packagePrice
@@ -147,7 +133,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
         setPendingTownshipId('')
         return
       }
-      updateDraft({ townshipId: '', assigneeType: '', assigneeId: '', estimatedDeliveryDate: '' })
+      updateDraft({ townshipId: '', estimatedDeliveryDate: '' })
       return
     }
     const township = townships.data?.find((candidate) => candidate.id === townshipId)
@@ -156,12 +142,15 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       setPendingTownshipId(township.id)
       return
     }
+    /**
+     * A township supplies money defaults and a lead time only — it never names
+     * an assignee, so choosing one leaves the assignee fields untouched.
+     */
     updateDraft({
       townshipId: township.id,
       deliveryFee: township.defaultDeliveryFee,
-      commissionFee: commissionFromTownship(township),
+      commissionFee: township.defaultCommissionFee,
       estimatedDeliveryDate: calculateEstimatedDate(township.leadTimeDays),
-      ...assigneeFromTownship(township),
     })
     setIsApplyingTownshipDefaults(true)
   }
@@ -169,11 +158,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   function confirmTownshipChange(overwriteDefaults: boolean) {
     if (pendingTownshipId === null) return
     if (pendingTownshipId === '') {
-      updateDraft({
-        townshipId: '',
-        estimatedDeliveryDate: '',
-        ...(overwriteDefaults ? { assigneeType: '', assigneeId: '' } : {}),
-      })
+      updateDraft({ townshipId: '', estimatedDeliveryDate: '' })
       setIsApplyingTownshipDefaults(false)
       setPendingTownshipId(null)
       return
@@ -185,8 +170,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       ...(overwriteDefaults
         ? {
             deliveryFee: pendingTownship.defaultDeliveryFee,
-            commissionFee: commissionFromTownship(pendingTownship),
-            ...assigneeFromTownship(pendingTownship),
+            commissionFee: pendingTownship.defaultCommissionFee,
           }
         : {}),
     })
@@ -205,7 +189,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       assigneeId: '',
       ...(assigneeType === 'PARTNER'
         ? { commissionFee: '0.00' }
-        : draft.commissionFee === '0.00' ? { commissionFee: commissionFromTownship(selectedTownship) } : {}),
+        : draft.commissionFee === '0.00' ? { commissionFee: selectedTownship?.defaultCommissionFee ?? '0.00' } : {}),
     })
   }
 
@@ -252,10 +236,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
     const isTownshipChanged = Boolean(order && draft.townshipId !== (order.townshipId ?? ''))
     try {
       if (order) {
-        const townshipDefaultAssignee = assigneeFromTownship(selectedTownship)
-        const isAssigneeStillTownshipDefault = draft.assigneeType === townshipDefaultAssignee.assigneeType
-          && draft.assigneeId === townshipDefaultAssignee.assigneeId
-        const canUseTownshipAssigneeDefault = isTownshipChanged && Boolean(selectedTownship) && isApplyingTownshipDefaults && isAssigneeStillTownshipDefault
         /**
          * One request means "adopt this township's money defaults", so the gate
          * covers the fee and the commission together: both must still match the
@@ -268,10 +248,9 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
           && selectedTownship?.defaultCommissionFee === draft.commissionFee
         const updateBody: UpdateOrderBody = {
           ...commonBody,
-          ...(!canUseTownshipAssigneeDefault ? assignmentBody : {}),
+          ...assignmentBody,
           ...(isTownshipChanged ? {
             applyTownshipFee: canUseTownshipMoneyDefault,
-            applyTownshipAssignee: canUseTownshipAssigneeDefault,
           } : {}),
           ...(isDeliveredOrder && hasChangedMoneyFields ? { reason: draft.reason } : {}),
         }
@@ -330,12 +309,12 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
             <Input id="order-commission-fee" inputMode="decimal" value={draft.commissionFee} disabled={costFieldsDisabled || isPartnerOrder} onChange={(event) => updateDraft({ commissionFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="order-partner-fee">Partner fee (internal)</Label>
-            <Input id="order-partner-fee" inputMode="decimal" value={draft.partnerFee} disabled={costFieldsDisabled} onChange={(event) => updateDraft({ partnerFee: event.target.value })} />
+            <Label htmlFor="order-partner-fee">{isPartnerOrder ? 'Partner fee (internal)' : 'Partner fee (internal · partner orders only)'}</Label>
+            <Input id="order-partner-fee" inputMode="decimal" value={draft.partnerFee} disabled={costFieldsDisabled || !isPartnerOrder} onChange={(event) => updateDraft({ partnerFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="order-partner-tracking">Partner tracking number</Label>
-            <Input id="order-partner-tracking" maxLength={FIELD_LIMITS.order.partnerTrackingNo} value={draft.partnerTrackingNo} onChange={(event) => updateDraft({ partnerTrackingNo: event.target.value })} />
+            <Label htmlFor="order-partner-tracking">{isPartnerOrder ? 'Partner tracking number' : 'Partner tracking number (partner orders only)'}</Label>
+            <Input id="order-partner-tracking" maxLength={FIELD_LIMITS.order.partnerTrackingNo} value={draft.partnerTrackingNo} disabled={!isPartnerOrder} onChange={(event) => updateDraft({ partnerTrackingNo: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2 sm:col-span-2">
             <Label htmlFor="order-address">Delivery address</Label>
@@ -350,6 +329,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
         <div className="grid gap-3 rounded-md bg-muted p-3 text-sm sm:grid-cols-2">
           <p>COD to collect <strong className="font-mono">{calculateCodToCollect(moneyPreview)}</strong></p>
           <p>Net owed to shop (estimated) <strong className="font-mono">{calculateNetOwedToShop(moneyPreview)}</strong></p>
+          <p className="text-xs text-muted-foreground sm:col-span-2">{NET_OWED_SIGN_NOTE}</p>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="order-notes">Notes</Label>

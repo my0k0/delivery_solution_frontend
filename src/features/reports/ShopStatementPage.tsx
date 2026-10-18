@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/EmptyState'
 import { useShops } from '@/features/shops/api'
 import type { OrderDateBasis } from '@/features/orders/api'
+import { NET_OWED_SIGN_NOTE } from '@/features/orders/money'
 import { formatMmk } from '@/lib/money'
 import { getApiErrorMessage } from '@/lib/api/client'
 import { fetchShopStatement, reportKeys, type ShopStatementQuery } from '@/features/reports/api'
@@ -12,8 +13,8 @@ import { ReportDateRange } from '@/features/reports/ReportDateRange'
 import { ReportExportButtons } from '@/features/reports/ReportExportButtons'
 
 const STATUS_SUMMARIES = [
-  { key: 'receivedCount', label: 'Received' },
-  { key: 'outForDeliveryCount', label: 'Out for delivery' },
+  { key: 'pendingCount', label: 'Pending' },
+  { key: 'assignedCount', label: 'Assigned' },
   { key: 'deliveredCount', label: 'Delivered' },
   { key: 'cancelledCount', label: 'Cancelled' },
 ] as const
@@ -43,8 +44,9 @@ export function ShopStatementPage() {
         <MoneySummary title="COD expected on open orders" amount={statement.data.codExpected} />
         <MoneySummary title="Net owed to shop · delivered (estimated)" amount={statement.data.netOwedToShopDelivered} />
         <MoneySummary title="Net owed to shop · pending (estimated)" amount={statement.data.pendingNetOwedToShop} />
+        <MoneySummary title="Advanced to shop (by advance date)" amount={statement.data.advancedToShop} />
       </section>
-      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules. Positive means the company owes the shop; negative means the shop owes the company. It is an estimate derived from order fields — the system holds no record of money actually received or paid, so treat it as an expectation, not a settled balance.</p>
+      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. {NET_OWED_SIGN_NOTE} &quot;Advanced to shop&quot; counts advances by the date they were recorded, not by the order&apos;s entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields — the system keeps no record of cash actually received, so treat COD as an expectation, not a settled balance.</p>
     </> : null}
   </div>
 }

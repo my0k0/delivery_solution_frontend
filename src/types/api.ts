@@ -488,6 +488,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{id}/shop-advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record that the company advanced the package price to the shop. No amount is accepted; the package price is snapshotted. */
+        post: operations["OrdersController_recordShopAdvance_v1"];
+        /** Clear a recorded shop advance. Refused on a cancelled order, where the advance is money owed back. */
+        delete: operations["OrdersController_clearShopAdvance_v1"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders/{id}": {
         parameters: {
             query?: never;
@@ -1286,6 +1304,13 @@ export interface components {
              * @example 500.00
              */
             commissionFee: string;
+            /**
+             * @description Package price the company advanced this shop for this order, snapshotted when the advance was recorded. Independent of later packagePrice edits; not exposed to shop users
+             * @example 47000.00
+             */
+            shopAdvanceAmount: string;
+            /** @description When the advance was paid; null = not yet advanced */
+            shopAdvancedAt?: Record<string, never> | null;
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @description Internal partner cost; not exposed to shop users */
@@ -1361,7 +1386,9 @@ export interface components {
             id: string;
             orderId: string;
             field: string;
+            /** @description Previous value. Identifier-valued fields (`shopId`, `customerId`, `townshipId`, `riderId`, `partnerId`) are resolved to the referenced record's name; `Unknown` marks a record that no longer exists. */
             oldValue?: Record<string, never> | null;
+            /** @description New value; identifiers resolved the same way as `oldValue`. */
             newValue?: Record<string, never> | null;
             actorId?: Record<string, never> | null;
             reason?: Record<string, never> | null;
@@ -1374,7 +1401,10 @@ export interface components {
             orderId: string;
             fromStatus?: components["schemas"]["OrderStatus"] | null;
             toStatus: components["schemas"]["OrderStatus"];
+            /** @description Id of the acting user. `changedByName` is what a reader shows; this stays for correlation. */
             changedBy?: Record<string, never> | null;
+            /** @description Resolved name of the acting user; null when the actor was deleted. */
+            changedByName?: Record<string, never> | null;
             note?: Record<string, never> | null;
             /** @description Shop-visible state-change reason */
             reason?: Record<string, never> | null;
@@ -1398,6 +1428,10 @@ export interface components {
             /** @description Internal note, not visible to the shop */
             internalNote: string;
         };
+        ShopAdvanceDto: {
+            /** @description Required when the order is DELIVERED; recorded on the field audit rows */
+            reason?: string;
+        };
         UpdateOrderDto: {
             shopId?: string;
             customerId?: string;
@@ -1418,8 +1452,6 @@ export interface components {
             notes?: Record<string, never> | null;
             /** @description Apply the new township default delivery fee */
             applyTownshipFee?: boolean;
-            /** @description Apply the new township default assignee */
-            applyTownshipAssignee?: boolean;
             /** @description Audit reason for changed fields */
             reason?: Record<string, never> | null;
         };
@@ -1450,6 +1482,13 @@ export interface components {
              * @example 500.00
              */
             commissionFee: string;
+            /**
+             * @description Package price the company advanced this shop for this order, snapshotted when the advance was recorded. Independent of later packagePrice edits; not exposed to shop users
+             * @example 47000.00
+             */
+            shopAdvanceAmount: string;
+            /** @description When the advance was paid; null = not yet advanced */
+            shopAdvancedAt?: Record<string, never> | null;
             isPackagePaidToShop: boolean;
             isFeePaidToShop: boolean;
             /** @description Internal partner cost; not exposed to shop users */
@@ -1463,6 +1502,11 @@ export interface components {
             notes?: Record<string, never> | null;
             createdAt: string;
             updatedAt: string;
+            shopName?: Record<string, never> | null;
+            customerName?: Record<string, never> | null;
+            townshipName?: Record<string, never> | null;
+            /** @description Name of the assigned rider or delivery partner; null when unassigned. */
+            assigneeName?: Record<string, never> | null;
             history: components["schemas"]["OrderHistoryResponseDto"][];
         };
         TownshipResponseDto: {
@@ -1471,9 +1515,6 @@ export interface components {
             defaultDeliveryFee: string;
             defaultCommissionFee: string;
             leadTimeDays: number;
-            defaultAssigneeType?: Record<string, never> | null;
-            defaultRiderId?: Record<string, never> | null;
-            defaultPartnerId?: Record<string, never> | null;
             createdAt: string;
             updatedAt: string;
         };
@@ -1484,20 +1525,12 @@ export interface components {
             /** @example 500.00 */
             defaultCommissionFee: string;
             leadTimeDays: number;
-            /** @enum {string|null} */
-            defaultAssigneeType?: "RIDER" | "PARTNER" | null;
-            defaultRiderId?: Record<string, never> | null;
-            defaultPartnerId?: Record<string, never> | null;
         };
         UpdateTownshipDto: {
             name?: string;
             defaultDeliveryFee?: string;
             defaultCommissionFee?: string;
             leadTimeDays?: number;
-            /** @enum {string|null} */
-            defaultAssigneeType?: "RIDER" | "PARTNER" | null;
-            defaultRiderId?: Record<string, never> | null;
-            defaultPartnerId?: Record<string, never> | null;
         };
         DeliveryPartnerResponseDto: {
             id: string;
@@ -1542,6 +1575,7 @@ export interface components {
             deliveryFee: string;
             codToCollect: string;
             netOwedToShop: string;
+            shopAdvanceAmount: string;
             partnerFee: string;
             createdAt: string;
             deliveredAt?: Record<string, never> | null;
@@ -1558,6 +1592,7 @@ export interface components {
             deliveryFee: string;
             codToCollect: string;
             netOwedToShop: string;
+            shopAdvanceAmount: string;
             partnerFee: string;
         };
         OrderReportResponseDto: {
@@ -1565,13 +1600,15 @@ export interface components {
             meta: components["schemas"]["ReportPaginationDto"];
             totals: components["schemas"]["OrderReportTotalsDto"];
         };
-        ShopStatementResponseDto: {
+        OfficeShopStatementResponseDto: {
+            shopId: string;
             shopName: string;
             dateFrom: string;
             dateTo: string;
             dateBasis: string;
-            receivedCount: number;
-            outForDeliveryCount: number;
+            pendingCount: number;
+            assignedCount: number;
+            awaitingApprovalCount: number;
             deliveredCount: number;
             cancelledCount: number;
             priceTotal: string;
@@ -1580,7 +1617,8 @@ export interface components {
             codExpected: string;
             netOwedToShopDelivered: string;
             pendingNetOwedToShop: string;
-            netOwedToShopTotal: string;
+            /** @description Flow: advances paid to this shop during the selected period, bucketed by the advance date */
+            advancedToShop: string;
         };
         RiderCollectionRowDto: {
             riderId: string;
@@ -1769,6 +1807,23 @@ export interface components {
             counts: components["schemas"]["ShopDashboardCountsDto"];
             money: components["schemas"]["ShopDashboardMoneyDto"];
             ordersPerDayByStatus: components["schemas"]["ShopOrdersPerDayDto"][];
+        };
+        ShopStatementResponseDto: {
+            shopName: string;
+            dateFrom: string;
+            dateTo: string;
+            dateBasis: string;
+            receivedCount: number;
+            outForDeliveryCount: number;
+            deliveredCount: number;
+            cancelledCount: number;
+            priceTotal: string;
+            feeTotal: string;
+            codCollected: string;
+            codExpected: string;
+            netOwedToShopDelivered: string;
+            pendingNetOwedToShop: string;
+            netOwedToShopTotal: string;
         };
     };
     responses: never;
@@ -2567,6 +2622,10 @@ export interface operations {
                 dateBasis?: "ENTRY" | "DELIVERED";
                 /** @description Filter by customer id */
                 customerId?: string;
+                /** @description ADVANCED = an advance is recorded. NOT_ADVANCED = an advance is still due (not customer-prepaid, not cancelled). */
+                shopAdvance?: "ADVANCED" | "NOT_ADVANCED";
+                /** @description Filter by whether the customer paid the shop for the package */
+                isPackagePaidToShop?: boolean;
             };
             header?: never;
             path?: never;
@@ -2780,6 +2839,56 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponseDto"];
+                };
+            };
+        };
+    };
+    OrdersController_recordShopAdvance_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShopAdvanceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponseDto"];
+                };
+            };
+        };
+    };
+    OrdersController_clearShopAdvance_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShopAdvanceDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -3134,7 +3243,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ShopStatementResponseDto"];
+                    "application/json": components["schemas"]["OfficeShopStatementResponseDto"];
                 };
             };
         };

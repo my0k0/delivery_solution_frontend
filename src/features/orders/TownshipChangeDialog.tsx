@@ -25,19 +25,32 @@ export function TownshipChangeDialog({ open, township, canApplyDefaults, onClose
           <DialogTitle>Change township?</DialogTitle>
           <DialogDescription>
             {township
-              ? `${township.name} has a default fee of ${township.defaultDeliveryFee} and a lead time of ${township.leadTimeDays} days. Choose whether to replace the current fee and assignee.`
-              : 'There are no township defaults to apply. Choose whether to keep the current assignee or clear it; the current fee will be kept.'}
+              ? `${township.name} has a default fee of ${township.defaultDeliveryFee} and a lead time of ${township.leadTimeDays} days. Choose whether to replace the current delivery fee and commission.`
+              : 'The current delivery fee, commission and assignee will be kept.'}
           </DialogDescription>
         </DialogHeader>
-        {!canApplyDefaults && <p className="text-sm text-muted-foreground">Your role can keep the current fee and assignee, but cannot apply cost defaults.</p>}
-        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onChoose(false)}>
-            Keep current fee and assignee
-          </Button>
-          <Button type="button" disabled={!canApplyDefaults} onClick={() => onChoose(true)}>
-            {township ? 'Apply township defaults' : 'Remove township and clear assignee'}
-          </Button>
-        </DialogFooter>
+        {township ? (
+          <>
+            {!canApplyDefaults && <p className="text-sm text-muted-foreground">Your role can keep the current fee and commission, but cannot apply cost defaults.</p>}
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => onChoose(false)}>
+                Keep current fee and commission
+              </Button>
+              <Button type="button" disabled={!canApplyDefaults} onClick={() => onChoose(true)}>
+                Apply township defaults
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => onChoose(false)}>
+              Remove township
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

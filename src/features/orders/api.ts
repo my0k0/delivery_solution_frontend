@@ -31,6 +31,7 @@ type OrderNullableFields =
   | 'deliveryAddress'
   | 'cancelReason'
   | 'notes'
+  | 'shopAdvancedAt'
 
 export type Order = Omit<GeneratedOrderResponse, OrderNullableFields> & {
   townshipId: string | null
@@ -44,12 +45,15 @@ export type Order = Omit<GeneratedOrderResponse, OrderNullableFields> & {
   deliveryAddress: string | null
   cancelReason: string | null
   notes: string | null
+  /** Codegen emits a `Record<string, never>` stub for this nullable date; type it properly. */
+  shopAdvancedAt: string | null
 }
 
 type GeneratedOrderHistory = components['schemas']['OrderHistoryResponseDto']
 type AssigneeSnapshot = { type: AssigneeType; riderId: string | null; partnerId: string | null }
-export type OrderHistory = Omit<GeneratedOrderHistory, 'changedBy' | 'note' | 'reason' | 'internalNote' | 'previousAssignee' | 'newAssignee'> & {
+export type OrderHistory = Omit<GeneratedOrderHistory, 'changedBy' | 'changedByName' | 'note' | 'reason' | 'internalNote' | 'previousAssignee' | 'newAssignee'> & {
   changedBy: string | null
+  changedByName: string | null
   note: string | null
   reason: string | null
   internalNote: string | null
@@ -57,7 +61,18 @@ export type OrderHistory = Omit<GeneratedOrderHistory, 'changedBy' | 'note' | 'r
   newAssignee: AssigneeSnapshot | null
 }
 
-export type OrderDetail = Order & { history: OrderHistory[] }
+/**
+ * `GET /orders/:id` resolves the referenced names, so an office reader who holds
+ * `orders.read` without `shops.read` / `customers.read` / `riders.read` still
+ * sees names rather than ids. The list endpoint carries ids only.
+ */
+export type OrderDetail = Order & {
+  shopName: string | null
+  customerName: string | null
+  townshipName: string | null
+  assigneeName: string | null
+  history: OrderHistory[]
+}
 
 type GeneratedAuditEntry = components['schemas']['OrderFieldAuditResponseDto']
 export type OrderAuditEntry = Omit<GeneratedAuditEntry, 'oldValue' | 'newValue' | 'actorId' | 'reason'> & {
@@ -95,11 +110,7 @@ export type UpdateOrderBody = Omit<GeneratedUpdateOrder, 'townshipId' | 'riderId
   reason?: string | null
 }
 
-export type Township = Omit<components['schemas']['TownshipResponseDto'], 'defaultAssigneeType' | 'defaultRiderId' | 'defaultPartnerId'> & {
-  defaultAssigneeType: AssigneeType | null
-  defaultRiderId: string | null
-  defaultPartnerId: string | null
-}
+export type Township = components['schemas']['TownshipResponseDto']
 
 export type DeliveryPartner = Omit<components['schemas']['DeliveryPartnerResponseDto'], 'phone' | 'note'> & {
   phone: string | null
@@ -113,6 +124,10 @@ export type DeliveryPartnerBody = Pick<components['schemas']['CreateDeliveryPart
 
 export type OrderReason = components['schemas']['OrderReasonDto']
 export type SendBackBody = components['schemas']['SendBackOrderDto']
+export type ShopAdvanceBody = components['schemas']['ShopAdvanceDto']
+export type ShopAdvanceFilter = NonNullable<
+  NonNullable<operations['OrdersController_list_v1']['parameters']['query']>['shopAdvance']
+>
 export type AssignBody = Omit<components['schemas']['AssignOrderDto'], 'riderId' | 'partnerId'> & {
   riderId?: string | null
   partnerId?: string | null
@@ -180,6 +195,15 @@ export async function sendBackOrder(orderId: string, body: SendBackBody): Promis
 
 export async function markPartnerDelivered(orderId: string): Promise<Order> {
   return (await http.post<Order>(`/orders/${orderId}/mark-delivered`)).data
+}
+
+/** The amount is never sent: the API snapshots the order's package price. */
+export async function recordShopAdvance(orderId: string, body: ShopAdvanceBody): Promise<Order> {
+  return (await http.post<Order>(`/orders/${orderId}/shop-advance`, body)).data
+}
+
+export async function clearShopAdvance(orderId: string, body: ShopAdvanceBody): Promise<Order> {
+  return (await http.delete<Order>(`/orders/${orderId}/shop-advance`, { data: body })).data
 }
 
 export async function fetchTownships(): Promise<Township[]> {
