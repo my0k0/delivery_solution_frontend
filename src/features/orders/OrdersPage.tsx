@@ -23,10 +23,11 @@ import {
   type OrderStatus,
   type ShopAdvanceFilter,
 } from '@/features/orders/api'
-import { calculateCodToCollect, calculateNetOwedToShop, NET_OWED_SIGN_NOTE } from '@/features/orders/money'
+import { calculateCodToCollect } from '@/features/orders/money'
 import { getTodayDate } from '@/features/reports/date-range'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
+import { ShopSettlementBadge } from '@/features/orders/components/ShopSettlementBadge'
 
 const PAGE_SIZE = 20
 
@@ -139,7 +140,7 @@ export function OrdersPage() {
           <div className="overflow-x-auto rounded-lg border border-border">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right" title={NET_OWED_SIGN_NOTE}>Net owed to shop (estimated)</TableHead>
+                <TableHead>Tracking</TableHead><TableHead>Status</TableHead><TableHead>Created</TableHead><TableHead>Est. delivery</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead title="Whether the company has paid the shop for this order's package, derived from the order's recorded fields rather than from a payment record.">Shop settlement</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 {orders.data.data.map((order) => (
@@ -149,13 +150,12 @@ export function OrdersPage() {
                     <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>{order.estimatedDeliveryDate ?? '—'}</TableCell>
                     <TableCell className="text-right font-mono">{calculateCodToCollect(order)}</TableCell>
-                    <TableCell className="text-right font-mono">{calculateNetOwedToShop(order)}</TableCell>
+                    <TableCell><ShopSettlementBadge order={order} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-          <p className="text-xs text-muted-foreground">{NET_OWED_SIGN_NOTE}</p>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>{orders.data.meta.total} orders · Page {orders.data.meta.page} of {Math.max(orders.data.meta.totalPages, 1)}</span>
             <div className="flex gap-2">

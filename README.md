@@ -46,10 +46,10 @@ pnpm codegen
 - Office staff register an order after the package arrives at the office. Creation requires a township and a shop/customer, and takes an assignee: an explicit rider or delivery partner, or the township default. A township with no default assignee leaves the order `PENDING`.
 - Each township carries a `defaultDeliveryFee` and a `leadTimeDays`. Selecting a township prefills the order’s editable fee (overridable per order) and the estimated delivery date.
 - Townships and riders are independent; riders have no township coverage. A township may name a default assignee, and one rider can cover many townships.
-- Order edits are audited field-by-field. Cost changes require `orders.update_costs`; cost changes after delivery approval also require `orders.update_after_approval` and a reason.
+- Order edits are audited field-by-field and require `orders.update`. An order that has ended (`DELIVERED`, `CANCELLED`) cannot be edited at all, so there are no post-approval money edits; the shop advance on a delivered order still needs `orders.update_after_approval` and a reason.
 - Riders submit an assigned order as delivered (`AWAITING_APPROVAL`); an officer approves it or sends it back. Partner orders are marked delivered by an officer directly.
 - Riders are routed to `/rider-board` (with `/rider-dashboard`) inside the office shell and see only their own orders. The board uses `YYYY-MM-DD` in the office timezone and defaults to `Asia/Yangon`.
-- Order states are `PENDING`, `ASSIGNED`, `AWAITING_APPROVAL`, `DELIVERED`, and `CANCELLED`. Clearing the assignee returns an order to `PENDING`; `CANCELLED` is the single terminal state, which now also covers a package that came back to the shop. There is no claim/start action, pickup flow, or shift/custody workflow.
+- Order states are `PENDING`, `ASSIGNED`, `AWAITING_APPROVAL`, `DELIVERED`, and `CANCELLED`. Clearing the assignee returns an order to `PENDING`; `DELIVERED` and `CANCELLED` are terminal, and a terminal order cannot be edited. `CANCELLED` now also covers a package that came back to the shop. There is no claim/start action, pickup flow, or shift/custody workflow.
 - The shop portal serves `/shop/*` with dedicated shop DTOs that exclude rider/partner identity, partner cost, internal notes, and audit data.
 
 ## Project conventions

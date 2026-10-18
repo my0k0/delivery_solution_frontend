@@ -178,7 +178,7 @@ Which orders count, by figure:
 | Rider commission **pending** | `AWAITING_APPROVAL` only |
 | **Every** payable figure | `CANCELLED` contributes 0 |
 
-Editing any money field (`packagePrice`, `deliveryFee`, `isPackagePaidToShop`, `isFeePaidToShop`, `partnerFee`, `commissionFee`) is gated by `orders.update` like any other edit. If the order is already `DELIVERED`, it additionally requires `orders.update_after_approval` **and** a non-empty reason; every changed field is written to `order_field_audit` with old value, new value, actor, and reason. Money fields are stored in the audit log as strings, so no precision is lost.
+Editing any field is gated by `orders.update`. An order that has **ended** — `DELIVERED` or `CANCELLED` — is immutable: `PATCH /orders/:id` answers 409, so a money figure can no longer be corrected on it. (`orders.update_after_approval` no longer unlocks an edit; it still guards the shop advance on a delivered order — §10.) Every changed field on an open order is written to `order_field_audit` with old value, new value, actor, and reason. Money fields are stored in the audit log as strings, so no precision is lost.
 
 Reading that log back is deliberately **not** a mirror of the columns. `GET /orders/:id/audit` resolves the identifier-valued fields (`shopId`, `customerId`, `townshipId`, `riderId`, `partnerId`) to the referenced record's name, so an office reader never has to interpret a uuid; the same applies to the order's own `shopName` / `customerName` / `townshipName` / `assigneeName` and to each history row's `changedByName`. This is not cosmetic: an OFFICER holds `orders.read` while `shops.read`, `customers.read`, and `riders.read` sit with ADMIN, so there is no lookup the officer's client could perform for itself. `actorId` and `changedBy` remain in the payload as ids for correlation and are never rendered.
 
@@ -202,7 +202,7 @@ Rules:
 - Earned commission is attributed to the **local date of `deliveredAt`**, not the approval date and not the entry date.
 - The rider payout report is a **single row per rider** over the selected date range (delivered orders → earned; awaiting-approval orders → pending). There is no per-day or per-way breakdown, and no "pay anyway" override — that concept was deleted along with ways.
 - The rider payout page has **no date-basis control**: the report fixes the basis internally per bucket (earned by `deliveredAt`, pending by `createdAt`), because a per-order commission has no single meaningful date to pivot on.
-- Post-approval changes to `commissionFee` are possible under `orders.update_after_approval` with a reason, and are audited like any other money field.
+- `commissionFee` is edited through `PATCH /orders/:id` while the order is **open**, and audited like any other money field. There is no post-approval path: once the order is `DELIVERED` it cannot be edited at all, so an approval is final. Verify the commission in the approval queue before approving.
 
 What the rider sees: **My deliveries** (own `ASSIGNED` orders, with the COD to collect), and **My dashboard** (delivered counts for today/week/month, commission earned, commission pending, COD to hand back today, and delivered orders per day).
 

@@ -23,12 +23,14 @@ import {
   updateOrder,
   type AssignBody,
   type OrderReason,
+  type OrderStatus,
   type SendBackBody,
   type ShopAdvanceBody,
   type UpdateOrderBody,
 } from '@/features/orders/api'
 import { orderAuditValue, orderFieldLabel } from '@/features/orders/audit-fields'
 import { calculateCodToCollect, calculateNetOwedToShop, NET_OWED_SIGN_NOTE } from '@/features/orders/money'
+import { ShopSettlementBadge } from '@/features/orders/components/ShopSettlementBadge'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { AssignOrderDialog } from '@/features/orders/AssignOrderDialog'
 import { PostponeOrderDialog } from '@/features/orders/PostponeOrderDialog'
@@ -49,6 +51,15 @@ type OrderAction =
   | { type: 'record-advance'; body: ShopAdvanceBody }
   | { type: 'undo-advance'; body: ShopAdvanceBody }
   | { type: 'edit'; body: UpdateOrderBody }
+
+/**
+ * An order is editable only while it is still in play. `DELIVERED` and
+ * `CANCELLED` have ended — the state machine allows no transition out of either
+ * and the API refuses `PATCH /orders/:id` with 409 — so the page offers no other
+ * action for them, and the shop advance (which is a settlement, not an edit)
+ * is the only remaining way to change a delivered order's money.
+ */
+const EDITABLE_ORDER_STATUSES: OrderStatus[] = ['PENDING', 'ASSIGNED', 'AWAITING_APPROVAL']
 
 /** Keyed on the action union, so a new action cannot ship without a message. */
 const ORDER_ACTION_MESSAGES: Record<OrderAction['type'], string> = {
@@ -71,6 +82,7 @@ export function OrderDetailPage() {
   const canCancel = usePermission('orders.cancel')
   const canApprove = usePermission('deliveries.approve')
   const canSettleShop = usePermission('orders.shop_settlement')
+  const canUpdateAfterApproval = usePermission('orders.update_after_approval')
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [activeDialog, setActiveDialog] = useState<'assign' | 'postpone' | 'cancel' | 'send-back' | 'approve' | 'mark-delivered' | 'record-advance' | 'undo-advance' | null>(null)
   const orderQuery = useQuery({ queryKey: orderKeys.detail(orderId), queryFn: () => fetchOrder(orderId), enabled: Boolean(orderId) })
@@ -102,15 +114,22 @@ export function OrderDetailPage() {
   })
 
   const order = orderQuery.data
-  const canEdit = canUpdate && order !== undefined && order.status !== 'CANCELLED'
+  const canEdit = canUpdate && order !== undefined && EDITABLE_ORDER_STATUSES.includes(order.status)
   const canAssignOrder = canUpdate && (order?.status === 'PENDING' || order?.status === 'ASSIGNED')
   const canPostponeOrder = canUpdate && order?.status === 'ASSIGNED'
   const canCancelOrder = canCancel && (order?.status === 'PENDING' || order?.status === 'ASSIGNED')
   const canReviewOrder = canApprove && order?.status === 'AWAITING_APPROVAL'
   const canMarkPartnerDelivered = canApprove && order?.status === 'ASSIGNED' && order.assigneeType === 'PARTNER'
   const isShopAdvanced = order?.shopAdvancedAt != null
-  const canRecordAdvance = canSettleShop && order !== undefined && !isShopAdvanced && !order.isPackagePaidToShop
-  const canClearAdvance = canSettleShop && isShopAdvanced && order?.status !== 'CANCELLED'
+  /**
+   * The API treats an advance as a settled cost: changing one on a `DELIVERED`
+   * order needs `orders.update_after_approval` (plus a reason) on top of
+   * `orders.shop_settlement`, so the buttons are withheld without it rather than
+   * offering an action the API will refuse.
+   */
+  const canChangeAdvance = canSettleShop && (order?.status !== 'DELIVERED' || canUpdateAfterApproval)
+  const canRecordAdvance = canChangeAdvance && order !== undefined && !isShopAdvanced && !order.isPackagePaidToShop
+  const canClearAdvance = canChangeAdvance && isShopAdvanced && order?.status !== 'CANCELLED'
   const isDelayed = Boolean(order?.estimatedDeliveryDate && order.estimatedDeliveryDate < new Date().toISOString().slice(0, 10)
     && !['DELIVERED', 'CANCELLED'].includes(order.status))
 
@@ -158,7 +177,7 @@ export function OrderDetailPage() {
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Net owed to shop (estimated)</p><p className="mt-1 font-mono font-semibold">{calculateNetOwedToShop(order)}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Estimated delivery</p><p className="mt-1">{order.estimatedDeliveryDate ?? '—'}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivered at</p><p className="mt-1">{order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : '—'}</p></div>
-        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Payment to shop</p><p className="mt-1">Package {order.isPackagePaidToShop ? 'paid' : 'unpaid'} · Fee {order.isFeePaidToShop ? 'paid' : 'unpaid'}</p></div>
+        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Customer paid the shop</p><p className="mt-1">Package {order.isPackagePaidToShop ? 'paid' : 'unpaid'} · Fee {order.isFeePaidToShop ? 'paid' : 'unpaid'}</p></div>
         {order.partnerTrackingNo && <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Partner tracking</p><p className="mt-1">{order.partnerTrackingNo}</p></div>}
         {order.deliveryAddress && <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivery address</p><p className="mt-1">{order.deliveryAddress}</p></div>}
         {order.notes && <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Notes</p><p className="mt-1">{order.notes}</p></div>}
@@ -169,7 +188,10 @@ export function OrderDetailPage() {
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4" aria-label="Shop advance">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold">Shop advance</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold">Shop advance</h2>
+              <ShopSettlementBadge order={order} />
+            </div>
             <p className="text-sm text-muted-foreground">
               Whether the company has already paid the shop the package price for this order. The recorded amount is
               snapshotted when it is recorded and does not follow later price edits.

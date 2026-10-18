@@ -38,7 +38,6 @@ interface OrderDraft {
   estimatedDeliveryDate: string
   deliveryAddress: string
   notes: string
-  reason: string
 }
 
 interface OrderFormProps {
@@ -65,7 +64,6 @@ function createDraft(order: Order | null): OrderDraft {
     estimatedDeliveryDate: order?.estimatedDeliveryDate ?? '',
     deliveryAddress: order?.deliveryAddress ?? '',
     notes: order?.notes ?? '',
-    reason: '',
   }
 }
 
@@ -79,7 +77,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const townships = useQuery({ queryKey: ['workflow-townships'], queryFn: fetchTownships })
   const riders = useQuery({ queryKey: ['operations', 'riders', 'active'], queryFn: () => fetchRiders({ page: 1, perPage: 100, status: 'ACTIVE' }) })
   const partners = useQuery({ queryKey: ['workflow-partners'], queryFn: fetchDeliveryPartners })
-  const canUpdateAfterApproval = usePermission('orders.update_after_approval')
   const canCreateOrder = usePermission('orders.create')
   const canUpdateOrder = usePermission('orders.update')
   const canSaveOrder = order ? canUpdateOrder : canCreateOrder
@@ -90,11 +87,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
   const townshipOptions = selectOptions(townships.data)
   const selectedTownship = townships.data?.find((township) => township.id === draft.townshipId)
   const pendingTownship = townships.data?.find((township) => township.id === pendingTownshipId) ?? null
-  const isDeliveredOrder = order?.status === 'DELIVERED'
-  /** Money fields ride on the same grant as any other order edit (`orders.update`). */
-  const canEditCosts = !order || canUpdateOrder
-  const canEditApprovedCosts = !isDeliveredOrder || canUpdateAfterApproval
-  const costFieldsDisabled = !canEditCosts || !canEditApprovedCosts
   /**
    * The assignee type decides which money fields apply. Commission is a rider
    * earning, so it is inert and the backend stores `'0'` for a partner order;
@@ -114,14 +106,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
      */
     shopAdvanceAmount: order?.shopAdvanceAmount ?? '0',
   }
-  const hasChangedMoneyFields = Boolean(order && (
-    order.packagePrice !== draft.packagePrice
-    || order.deliveryFee !== draft.deliveryFee
-    || order.commissionFee !== draft.commissionFee
-    || order.partnerFee !== (draft.partnerFee || '0.00')
-    || order.isPackagePaidToShop !== draft.isPackagePaidToShop
-    || order.isFeePaidToShop !== draft.isFeePaidToShop
-  ))
 
   function updateDraft(changes: Partial<OrderDraft>) {
     setDraft((currentDraft) => ({ ...currentDraft, ...changes }))
@@ -252,7 +236,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
           ...(isTownshipChanged ? {
             applyTownshipFee: canUseTownshipMoneyDefault,
           } : {}),
-          ...(isDeliveredOrder && hasChangedMoneyFields ? { reason: draft.reason } : {}),
         }
         if (canUseTownshipMoneyDefault) {
           delete updateBody.deliveryFee
@@ -298,19 +281,19 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-package-price">Package price</Label>
-            <Input id="order-package-price" inputMode="decimal" value={draft.packagePrice} disabled={costFieldsDisabled} onChange={(event) => updateDraft({ packagePrice: event.target.value })} />
+            <Input id="order-package-price" inputMode="decimal" value={draft.packagePrice} onChange={(event) => updateDraft({ packagePrice: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-delivery-fee">Delivery fee</Label>
-            <Input id="order-delivery-fee" inputMode="decimal" value={draft.deliveryFee} disabled={costFieldsDisabled} onChange={(event) => updateDraft({ deliveryFee: event.target.value })} />
+            <Input id="order-delivery-fee" inputMode="decimal" value={draft.deliveryFee} onChange={(event) => updateDraft({ deliveryFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-commission-fee">{isPartnerOrder ? 'Rider commission (no partner commission)' : 'Rider commission'}</Label>
-            <Input id="order-commission-fee" inputMode="decimal" value={draft.commissionFee} disabled={costFieldsDisabled || isPartnerOrder} onChange={(event) => updateDraft({ commissionFee: event.target.value })} />
+            <Input id="order-commission-fee" inputMode="decimal" value={draft.commissionFee} disabled={isPartnerOrder} onChange={(event) => updateDraft({ commissionFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-partner-fee">{isPartnerOrder ? 'Partner fee (internal)' : 'Partner fee (internal · partner orders only)'}</Label>
-            <Input id="order-partner-fee" inputMode="decimal" value={draft.partnerFee} disabled={costFieldsDisabled || !isPartnerOrder} onChange={(event) => updateDraft({ partnerFee: event.target.value })} />
+            <Input id="order-partner-fee" inputMode="decimal" value={draft.partnerFee} disabled={!isPartnerOrder} onChange={(event) => updateDraft({ partnerFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-partner-tracking">{isPartnerOrder ? 'Partner tracking number' : 'Partner tracking number (partner orders only)'}</Label>
@@ -321,7 +304,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
             <Input id="order-address" maxLength={FIELD_LIMITS.order.deliveryAddress} value={draft.deliveryAddress} onChange={(event) => updateDraft({ deliveryAddress: event.target.value })} />
           </div>
         </div>
-        <fieldset disabled={costFieldsDisabled} className="flex flex-wrap gap-x-6 gap-y-3 rounded-md border border-border p-3 text-sm disabled:opacity-60">
+        <fieldset className="flex flex-wrap gap-x-6 gap-y-3 rounded-md border border-border p-3 text-sm">
           <legend className="px-1 font-medium">Already paid to shop</legend>
           <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={draft.isPackagePaidToShop} onChange={(event) => updateDraft({ isPackagePaidToShop: event.target.checked })} />Package price paid</label>
           <label className="flex min-h-10 items-center gap-2"><input type="checkbox" checked={draft.isFeePaidToShop} onChange={(event) => updateDraft({ isFeePaidToShop: event.target.checked })} />Delivery fee paid</label>
@@ -335,12 +318,6 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
           <Label htmlFor="order-notes">Notes</Label>
           <textarea id="order-notes" maxLength={FIELD_LIMITS.order.notes} className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} />
         </div>
-        {isDeliveredOrder && hasChangedMoneyFields && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="order-edit-reason">Reason for changing delivered order costs</Label>
-            <textarea id="order-edit-reason" required maxLength={FIELD_LIMITS.order.reason} className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" value={draft.reason} onChange={(event) => updateDraft({ reason: event.target.value })} />
-          </div>
-        )}
         {message && <p role="alert" className="text-sm text-destructive">{message}</p>}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -350,7 +327,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       <TownshipChangeDialog
         open={pendingTownshipId !== null}
         township={pendingTownship}
-        canApplyDefaults={!order || (pendingTownshipId === '' ? canUpdateOrder : canUpdateOrder && canUpdateAfterApproval)}
+        canApplyDefaults={!order || canUpdateOrder}
         onClose={() => setPendingTownshipId(null)}
         onChoose={confirmTownshipChange}
       />
