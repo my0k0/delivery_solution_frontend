@@ -61,4 +61,5 @@ export const FIELD_LIMITS = {
     internalNote: 2000,
   },
   way: { payAnywayReason: 1000 },
+  handover: { note: 500, reason: 500 },
 } as const

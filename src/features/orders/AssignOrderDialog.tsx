@@ -17,12 +17,16 @@ interface AssignOrderDialogProps {
 
 export function AssignOrderDialog({ order, pending, onClose, onSave }: AssignOrderDialogProps) {
   const canUpdateOrder = usePermission('orders.update')
-  // Dedicated endpoint: only riders the office may actually assign to.
-  const riders = useAssignableRiders()
-  const partners = useQuery({ queryKey: ['workflow-partners'], queryFn: fetchDeliveryPartners })
   const [assigneeType, setAssigneeType] = useState<'RIDER' | 'PARTNER' | ''>('')
   const [assigneeId, setAssigneeId] = useState('')
   const [message, setMessage] = useState('')
+  /**
+   * Each list is fetched only once the user picks that type, so opening the
+   * orders list costs no assignee requests at all. The rider list is the
+   * dedicated `/riders/assignable` endpoint: only riders the office may assign.
+   */
+  const riders = useAssignableRiders({ enabled: assigneeType === 'RIDER' })
+  const partners = useQuery({ queryKey: ['workflow-partners'], queryFn: fetchDeliveryPartners, enabled: assigneeType === 'PARTNER' })
   const riderOptions = (riders.data ?? []).map((rider) => ({ value: rider.id, label: rider.name }))
   const partnerOptions = (partners.data ?? []).filter((partner) => partner.isActive).map((partner) => ({ value: partner.id, label: partner.name }))
   /**

@@ -22,6 +22,7 @@ import {
   sendBackOrder,
   updateOrder,
   type AssignBody,
+  type OrderDetail,
   type OrderReason,
   type OrderStatus,
   type SendBackBody,
@@ -72,6 +73,35 @@ const ORDER_ACTION_MESSAGES: Record<OrderAction['type'], string> = {
   'record-advance': 'Shop advance recorded',
   'undo-advance': 'Shop advance cleared',
   edit: 'Order changes saved',
+}
+
+/** The reason behind the quiet dash on the commission tile. */
+const CANCELLED_NO_COMMISSION_REASON = 'Cancelled — the rider earns no commission for this order.'
+
+/**
+ * A cancelled order earns no commission: a rider is paid per delivered order,
+ * and this one never became one. The tile shows a quiet dash rather than a
+ * sentence — the summary is a label/value list, and a sentence is the one value
+ * in it that can wrap. The reason stays available on hover and to screen
+ * readers, and the status badge at the top of the page already says cancelled.
+ *
+ * A partner order earns no commission either — the partner is paid its own fee,
+ * not a rider commission, and the API forces the stored number to `'0.00'`. The
+ * tile states the rule instead of printing that zero, which would read as "the
+ * rider earned nothing on this one" rather than "partners are never paid this".
+ */
+function CommissionValue({ order }: { order: Pick<OrderDetail, 'status' | 'assigneeType' | 'commissionFee'> }) {
+  if (order.status === 'CANCELLED') {
+    return (
+      <p className="mt-1 font-mono text-muted-foreground" title={CANCELLED_NO_COMMISSION_REASON}>
+        —<span className="sr-only"> {CANCELLED_NO_COMMISSION_REASON}</span>
+      </p>
+    )
+  }
+  if (order.assigneeType === 'PARTNER') {
+    return <p className="mt-1 text-muted-foreground">No commission for partner deliveries</p>
+  }
+  return <p className="mt-1 font-mono">{order.commissionFee}</p>
 }
 
 export function OrderDetailPage() {
@@ -170,7 +200,7 @@ export function OrderDetailPage() {
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Customer</p><p className="mt-1 font-medium">{customerName}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Township</p><p className="mt-1 font-medium">{townshipName}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Assignee</p><p className="mt-1 font-medium">{assigneeName}</p></div>
-        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Rider commission</p><p className="mt-1 font-mono">{order.assigneeType === 'PARTNER' ? 'Partner delivery · no commission' : order.commissionFee}</p></div>
+        <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Rider commission</p><CommissionValue order={order} /></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Package price</p><p className="mt-1 font-mono">{order.packagePrice}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Delivery fee</p><p className="mt-1 font-mono">{order.deliveryFee}</p></div>
         <div><p className="text-xs uppercase tracking-wide text-muted-foreground">COD to collect</p><p className="mt-1 font-mono font-semibold">{calculateCodToCollect(order)}</p></div>

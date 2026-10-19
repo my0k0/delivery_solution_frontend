@@ -95,6 +95,12 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
    */
   const isPartnerOrder = draft.assigneeType === 'PARTNER'
   const moneyPreview = {
+    /**
+     * The preview's figures are gated on status, and this form only ever writes
+     * an order that is still open — a new order starts `PENDING`, and a terminal
+     * one offers no edit — so it declares an open status for the create case.
+     */
+    status: order?.status ?? 'PENDING',
     packagePrice: draft.packagePrice,
     deliveryFee: draft.deliveryFee,
     isPackagePaidToShop: draft.isPackagePaidToShop,
@@ -164,9 +170,15 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
 
   function setAssignee(assigneeType: AssigneeType | '') {
     /**
-     * The commission follows the assignee: a partner order has none, and moving
-     * back to a rider re-fills the township prefill — but only while the field
-     * still holds the untouched `0.00`, so a typed value is never clobbered.
+     * The assignee type decides which cost fields apply. The commission follows
+     * it: a partner order has none, and moving back to a rider re-fills the
+     * township prefill — but only while the field still holds the untouched
+     * `0.00`, so a typed value is never clobbered.
+     *
+     * The partner fields are the mirror image and are dropped the moment the
+     * assignee stops being a partner: they are inert without one, and the API
+     * stores `'0'`/`null` for anything else, so keeping a value typed for a
+     * partner would only send a cost this order does not have.
      */
     updateDraft({
       assigneeType,
@@ -174,6 +186,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
       ...(assigneeType === 'PARTNER'
         ? { commissionFee: '0.00' }
         : draft.commissionFee === '0.00' ? { commissionFee: selectedTownship?.defaultCommissionFee ?? '0.00' } : {}),
+      ...(assigneeType === 'PARTNER' ? {} : { partnerFee: '0.00', partnerTrackingNo: '' }),
     })
   }
 
@@ -288,7 +301,7 @@ export function OrderForm({ order, pending, onCancel, onSave }: OrderFormProps) 
             <Input id="order-delivery-fee" inputMode="decimal" value={draft.deliveryFee} onChange={(event) => updateDraft({ deliveryFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="order-commission-fee">{isPartnerOrder ? 'Rider commission (no partner commission)' : 'Rider commission'}</Label>
+            <Label htmlFor="order-commission-fee">{isPartnerOrder ? 'No commission for partner deliveries' : 'Rider commission'}</Label>
             <Input id="order-commission-fee" inputMode="decimal" value={draft.commissionFee} disabled={isPartnerOrder} onChange={(event) => updateDraft({ commissionFee: event.target.value })} />
           </div>
           <div className="flex flex-col gap-2">

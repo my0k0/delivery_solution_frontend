@@ -33,7 +33,7 @@ export function ApprovalQueuePage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div><h1 className="text-xl font-semibold tracking-tight">Approval queue</h1><p className="text-sm text-muted-foreground">Review rider-submitted deliveries before COD is counted as received.</p></div>
+      <div><h1 className="text-xl font-semibold tracking-tight">Confirm deliveries</h1><p className="text-sm text-muted-foreground">Review rider-submitted deliveries before COD is counted as expected back from the rider.</p></div>
       {queue.isLoading ? <div className="space-y-2" aria-label="Loading approval queue">{[0, 1, 2].map((row) => <div key={row} className="h-12 animate-pulse rounded-md bg-muted" />)}</div> : queue.isError ? <p role="alert" className="text-sm text-destructive">{getApiErrorMessage(queue.error)}</p> : queue.data?.data.length ? <div className="overflow-x-auto rounded-lg border border-border">
         <Table><TableHeader><TableRow><TableHead>Tracking</TableHead><TableHead>Submitted</TableHead><TableHead>Assignee</TableHead><TableHead className="text-right">COD to collect</TableHead><TableHead className="text-right">Review</TableHead></TableRow></TableHeader><TableBody>
           {queue.data.data.map((order) => <TableRow key={order.id}>

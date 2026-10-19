@@ -20,6 +20,7 @@ import { RidersPage } from '@/features/riders/RidersPage'
 import { OrdersPage } from '@/features/orders/OrdersPage'
 import { OrderDetailPage } from '@/features/orders/OrderDetailPage'
 import { ApprovalQueuePage } from '@/features/orders/ApprovalQueuePage'
+import { RiderHandoversPage } from '@/features/rider-handovers/RiderHandoversPage'
 import { TownshipsPage } from '@/features/townships/TownshipsPage'
 import { DeliveryPartnersPage } from '@/features/partners/DeliveryPartnersPage'
 import { RiderBoardPage } from '@/features/riders/RiderBoardPage'
@@ -102,6 +103,7 @@ function AppRoutes() {
             <Route element={<ProtectedRoute perm="orders.read" />}><Route path="/orders" element={<OrdersPage />} /></Route>
             <Route element={<ProtectedRoute perm="orders.read" />}><Route path="/orders/approval" element={<ApprovalQueuePage />} /></Route>
             <Route element={<ProtectedRoute perm="orders.read" />}><Route path="/orders/:orderId" element={<OrderDetailPage />} /></Route>
+            <Route element={<ProtectedRoute perm="rider-handovers.read" />}><Route path="/rider-handovers" element={<RiderHandoversPage />} /></Route>
             <Route element={<ProtectedRoute perm="townships.read" />}><Route path="/townships" element={<TownshipsPage />} /></Route>
             <Route element={<ProtectedRoute perm="partners.read" />}><Route path="/partners" element={<DeliveryPartnersPage />} /></Route>
             <Route element={<ProtectedRoute perm="deliveries.read" roles={['RIDER']} />}><Route path="/rider-board" element={<RiderBoardPage />} /></Route>

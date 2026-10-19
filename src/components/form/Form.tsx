@@ -87,6 +87,12 @@ export function FormBody({ children, className }: FormBodyProps) {
 interface FormFooterProps {
   submitLabel: string
   isSubmitting: boolean
+  /**
+   * For a form whose only pending change is the edit itself — a correction with
+   * nothing changed has nothing to send, and the backend's "Nothing changed"
+   * rejection is a round trip to learn what the client already knows.
+   */
+  isSubmitDisabled?: boolean
 }
 
 /**
@@ -97,13 +103,17 @@ interface FormFooterProps {
  * `DialogClose` drives the dialog's own `onOpenChange`, so the parent still
  * runs its `onClose` cleanup — no `onClose` prop needed here.
  */
-export function FormFooter({ submitLabel, isSubmitting }: FormFooterProps) {
+export function FormFooter({
+  submitLabel,
+  isSubmitting,
+  isSubmitDisabled = false,
+}: FormFooterProps) {
   return (
     <DialogFooter>
       <DialogClose render={<Button type="button" variant="outline" />}>
         Close
       </DialogClose>
-      <Button type="submit" disabled={isSubmitting}>
+      <Button type="submit" disabled={isSubmitting || isSubmitDisabled}>
         {submitLabel}
       </Button>
     </DialogFooter>

@@ -46,7 +46,7 @@ export function ShopStatementPage() {
         <MoneySummary title="Net owed to shop · pending (estimated)" amount={statement.data.pendingNetOwedToShop} />
         <MoneySummary title="Advanced to shop (by advance date)" amount={statement.data.advancedToShop} />
       </section>
-      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. {NET_OWED_SIGN_NOTE} &quot;Advanced to shop&quot; counts advances by the date they were recorded, not by the order&apos;s entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields — the system keeps no record of cash actually received, so treat COD as an expectation, not a settled balance.</p>
+      <p className="text-xs text-muted-foreground">Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. {NET_OWED_SIGN_NOTE} &quot;Advanced to shop&quot; counts advances by the date they were recorded, not by the order&apos;s entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields. The office does record the cash riders hand in, on the rider handovers page, but per rider and never against an order or a shop — so treat COD as an expectation, not a settled balance.</p>
     </> : null}
   </div>
 }

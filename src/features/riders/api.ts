@@ -10,6 +10,15 @@ export type RiderVehicleType = components['schemas']['RiderVehicleType']
 export type AssignableRider = components['schemas']['AssignableRiderResponseDto']
 
 /**
+ * The `perPage` ceiling on `GET /riders` — its query DTO caps the value at 100.
+ *
+ * Anything that needs the whole fleet in one request is bounded by this, which is
+ * why it is named rather than written as `100` at each call site: a list that
+ * silently stops part-way looks complete.
+ */
+export const RIDER_LIST_MAX_PER_PAGE = 100
+
+/**
  * Explicit DTOs. Codegen stubs the nullable strings as `Record<string, never>`;
  * the backend files `string | null`. These give mutation bodies proper types
  * without casting to `any`.
@@ -101,12 +110,16 @@ export function useRiders(filters: RidersFilters) {
  * Active riders eligible for office order assignment. Backs the order create
  * form's rider selector; requires `orders.create`. The list is independent of
  * the selected township.
+ *
+ * Pass `enabled: false` where the list is only needed behind an interaction
+ * (the assign dialog fetches riders only once the user picks that type).
  */
-export function useAssignableRiders() {
+export function useAssignableRiders(options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ridersKeys.assignable,
     queryFn: fetchAssignableRiders,
     staleTime: 30_000,
+    enabled: options.enabled ?? true,
   })
 }
 

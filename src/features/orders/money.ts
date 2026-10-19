@@ -1,4 +1,4 @@
-import type { Order } from '@/features/orders/api'
+import type { Order, OrderStatus } from '@/features/orders/api'
 
 function toMinorUnits(value: string): bigint {
   const normalizedValue = value.trim()
@@ -17,7 +17,21 @@ function fromMinorUnits(value: bigint): string {
   return `${sign}${groupedWhole}.${fractional}`
 }
 
-export function calculateCodToCollect(order: Pick<Order, 'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop'>): string {
+/**
+ * Every payable figure is scoped to the orders that can still produce money. The
+ * reports apply the same gate in SQL (`payableMoneyExpression`, the order-report
+ * row cases) and the shop portal applies it to its own rows, so a client figure
+ * can never contradict a report an officer can export. A cancelled order is the
+ * only status left out: its recorded amounts stay visible as history, while the
+ * figures derived from them are not payable.
+ */
+const PAYABLE_ORDER_STATUSES: OrderStatus[] = ['PENDING', 'ASSIGNED', 'AWAITING_APPROVAL', 'DELIVERED']
+
+/** The canonical zero, matching the API's `numeric(14, 2)::text` output. */
+const ZERO_AMOUNT = '0.00'
+
+export function calculateCodToCollect(order: Pick<Order, 'status' | 'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop'>): string {
+  if (!PAYABLE_ORDER_STATUSES.includes(order.status)) return ZERO_AMOUNT
   const packageAmount = order.isPackagePaidToShop ? 0n : toMinorUnits(order.packagePrice)
   const deliveryAmount = order.isFeePaidToShop ? 0n : toMinorUnits(order.deliveryFee)
   return fromMinorUnits(packageAmount + deliveryAmount)
@@ -25,7 +39,7 @@ export function calculateCodToCollect(order: Pick<Order, 'packagePrice' | 'deliv
 
 type NetOwedToShopOrder = Pick<
   Order,
-  'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop' | 'shopAdvanceAmount'
+  'status' | 'packagePrice' | 'deliveryFee' | 'isPackagePaidToShop' | 'isFeePaidToShop' | 'shopAdvanceAmount'
 >
 
 /**
@@ -39,15 +53,21 @@ function netOwedToShopMinorUnits(order: NetOwedToShopOrder): bigint {
   return packageAmount - deliveryAmount - toMinorUnits(order.shopAdvanceAmount)
 }
 
+/**
+ * `0.00` on an order that ended, for the same reason as `calculateCodToCollect`.
+ * The settlement badge derives its figures from `netOwedToShopMinorUnits`
+ * directly, so it still names the advance a cancelled order has to give back.
+ */
 export function calculateNetOwedToShop(order: NetOwedToShopOrder): string {
+  if (!PAYABLE_ORDER_STATUSES.includes(order.status)) return ZERO_AMOUNT
   return fromMinorUnits(netOwedToShopMinorUnits(order))
 }
 
 /**
  * `calculateNetOwedToShop` returns a negative number whenever the shop holds
- * company money — it collected the delivery fee, or the order was advanced and
- * then cancelled. Shown wherever the figure is printed bare, so a minus sign is
- * never read as a data error.
+ * company money — it collected the delivery fee, or the order was advanced beyond
+ * what the package was worth. Shown wherever the figure is printed bare, so a
+ * minus sign is never read as a data error.
  */
 export const NET_OWED_SIGN_NOTE =
   'Net owed to shop can be negative: positive means the company owes the shop; negative means the shop owes the company.'
@@ -78,10 +98,16 @@ export interface ShopSettlement {
   state: ShopSettlementState
   /** What the company owes the shop for the package, before the advance. */
   packageOwed: string
-  /** Signed net owed to shop, identical to `calculateNetOwedToShop`. */
+  /**
+   * Signed net owed to shop, ungated by status (unlike the exported
+   * `calculateNetOwedToShop`). No state prints it for a cancelled order — the
+   * amount that matters there is `amountHeldByShop`.
+   */
   netOwedToShop: string
   /** The snapshotted amount the shop was advanced; `'0.00'` when none. */
   shopAdvanceAmount: string
+  /** Company money the shop holds, unsigned: the negative net, or the advance on a cancelled order. */
+  amountHeldByShop: string
 }
 
 type ShopSettlementOrder = Pick<
@@ -97,9 +123,25 @@ export function calculateShopSettlement(order: ShopSettlementOrder): ShopSettlem
     packageOwed: fromMinorUnits(packageOwedMinorUnits),
     netOwedToShop: fromMinorUnits(netOwedMinorUnits),
     shopAdvanceAmount: fromMinorUnits(advanceMinorUnits),
+    amountHeldByShop: fromMinorUnits(netOwedMinorUnits < 0n ? -netOwedMinorUnits : 0n),
   }
   if (order.status === 'CANCELLED') {
-    return { state: advanceMinorUnits > 0n ? 'SHOP_OWES_COMPANY' : 'NOTHING_PAYABLE', ...amounts }
+    /**
+     * Nothing is payable on a cancelled order, so the order-level net says
+     * nothing about what the shop holds back: a 4,000 package price against a
+     * 4,000 advance nets to 0, which is not "the shop holds nothing". The money
+     * the shop owes back here is the advance itself — the same quantity the
+     * state keys on and the reason line names.
+     *
+     * A delivery fee the shop collected on a cancelled order is the separate,
+     * still-unresolved question in the money model (§8.6 of `business-flows.md`);
+     * whether it is reclaimable is a domain decision, so it is not folded in.
+     */
+    return {
+      state: advanceMinorUnits > 0n ? 'SHOP_OWES_COMPANY' : 'NOTHING_PAYABLE',
+      ...amounts,
+      amountHeldByShop: fromMinorUnits(advanceMinorUnits),
+    }
   }
   // A negative net means the shop holds company money — the fee it collected, or
   // an advance beyond what was owed — and no payable state outranks that.

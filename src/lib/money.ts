@@ -27,6 +27,50 @@ export function maximumMoney(values: readonly string[]): string {
   }, 0n))
 }
 
+/**
+ * `left − right`, exactly, on the same bigint minor units as the other helpers.
+ * The handover dialog uses it to show the balance an entry would leave behind, so
+ * an over-recording is visible before it is saved rather than only after. Not for
+ * stored figures: the API's balances come from Postgres `numeric` and are never
+ * re-added in JS.
+ */
+export function subtractMoney(left: string, right: string): string {
+  return fromMinorUnits(toMinorUnits(left) - toMinorUnits(right))
+}
+
+/**
+ * Whether `amount` is strictly more than `ceiling`, compared on the same bigint
+ * minor units as the other helpers so `16500` and `16500.00` agree.
+ *
+ * The handover dialog uses it to decide whether recording an amount needs a
+ * confirmation, because that decision must match the arithmetic the balance is
+ * displayed with. A value that is not an amount at all reads as zero here, so a
+ * caller compares only input it has already validated.
+ */
+export function isMoreMoneyThan(amount: string, ceiling: string): boolean {
+  return toMinorUnits(amount) > toMinorUnits(ceiling)
+}
+
+/** A decimal amount: an optional sign, digits, and at most two decimals. */
+const DECIMAL_MONEY_PATTERN = /^-?\d+(\.\d{1,2})?$/
+
+/**
+ * Whether a string is a decimal amount at all — the gate for every reader here.
+ * `toMinorUnits` reads unparseable input as zero, so a caller that formats must
+ * ask first; otherwise `'abc'` renders as `0.00` and reads as a real figure.
+ */
+export function isMoneyString(value: string): boolean {
+  return DECIMAL_MONEY_PATTERN.test(value.trim())
+}
+
+/**
+ * Whether an amount is exactly zero, whatever spelling it arrives in (`'0.00'`,
+ * `'0'`, `'-0.00'`). A value that is not an amount at all is never settled.
+ */
+export function isZeroMoney(value: string): boolean {
+  return isMoneyString(value) && toMinorUnits(value) === 0n
+}
+
 export function formatMmk(value: string): string {
   return `${fromMinorUnits(toMinorUnits(value))} MMK`
 }

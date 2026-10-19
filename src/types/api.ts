@@ -859,6 +859,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/rider-handovers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recorded handovers with filters and pagination */
+        get: operations["RiderHandoversController_list_v1"];
+        put?: never;
+        /** Record cash a rider has handed back */
+        post: operations["RiderHandoversController_create_v1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rider-handovers/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-rider delivered COD, accepted cash and the balance between them */
+        get: operations["RiderHandoversController_listBalances_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rider-handovers/{id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Per-field history of a handover that has been corrected */
+        get: operations["RiderHandoversController_getAudit_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rider-handovers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct a handover in place; the reason is required */
+        patch: operations["RiderHandoversController_update_v1"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1824,6 +1893,82 @@ export interface components {
             netOwedToShopDelivered: string;
             pendingNetOwedToShop: string;
             netOwedToShopTotal: string;
+        };
+        RiderHandoverResponseDto: {
+            id: string;
+            riderId: string;
+            riderName: string;
+            /** @example 12000.00 */
+            amount: string;
+            /** @example 2026-10-20 */
+            receivedOn: string;
+            /** @enum {string} */
+            method: "KPAY" | "CASH" | "BANK_TRANSFER";
+            note?: Record<string, never> | null;
+            recordedByName?: Record<string, never> | null;
+            createdAt: string;
+            updatedAt: string;
+        };
+        RiderHandoverListResponseDto: {
+            data: components["schemas"]["RiderHandoverResponseDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+        };
+        RiderHandoverBalanceResponseDto: {
+            riderId: string;
+            riderName: string;
+            /** @enum {string} */
+            riderStatus: "ACTIVE" | "INACTIVE";
+            /** @example 38000.00 */
+            deliveredCod: string;
+            /** @example 26000.00 */
+            accepted: string;
+            /** @example 12000.00 */
+            balance: string;
+            /** @example 2026-10-18 */
+            lastReceivedOn?: Record<string, never> | null;
+            /** @example 2026-10-12 */
+            oldestUnsettledDeliveredOn?: Record<string, never> | null;
+        };
+        RiderHandoverBalanceListResponseDto: {
+            data: components["schemas"]["RiderHandoverBalanceResponseDto"][];
+            meta: components["schemas"]["PaginationMetaDto"];
+        };
+        CreateRiderHandoverDto: {
+            /** Format: uuid */
+            riderId: string;
+            /** @example 12000.00 */
+            amount: string;
+            /** @example 2026-10-20 */
+            receivedOn: string;
+            /** @enum {string} */
+            method: "KPAY" | "CASH" | "BANK_TRANSFER";
+            note?: string | null;
+        };
+        RiderHandoverAuditResponseDto: {
+            id: string;
+            handoverId: string;
+            field: string;
+            /** @description Previous value. A `riderId` change is resolved to the rider's name, the way the order audit resolves its identifier-valued fields; `Unknown` marks a record that no longer exists. */
+            oldValue?: Record<string, never> | null;
+            /** @description New value; identifiers resolved the same way as `oldValue`. */
+            newValue?: Record<string, never> | null;
+            actorId?: Record<string, never> | null;
+            actorName?: Record<string, never> | null;
+            reason?: Record<string, never> | null;
+            createdAt: string;
+        };
+        UpdateRiderHandoverDto: {
+            /** Format: uuid */
+            riderId?: string;
+            /** @example 12000.00 */
+            amount?: string;
+            /** @example 2026-10-20 */
+            receivedOn?: string;
+            /** @enum {string} */
+            method?: "KPAY" | "CASH" | "BANK_TRANSFER";
+            note?: string | null;
+            /** @description Why the handover is being corrected. Required on every edit. */
+            reason: string;
         };
     };
     responses: never;
@@ -3571,6 +3716,128 @@ export interface operations {
                 content: {
                     "text/csv; charset=utf-8": string;
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    RiderHandoversController_list_v1: {
+        parameters: {
+            query?: {
+                /** @description Filter by rider id */
+                riderId?: string;
+                method?: "KPAY" | "CASH" | "BANK_TRANSFER";
+                dateFrom?: string;
+                dateTo?: string;
+                page?: components["schemas"]["Object"];
+                perPage?: components["schemas"]["Object"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderHandoverListResponseDto"];
+                };
+            };
+        };
+    };
+    RiderHandoversController_create_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRiderHandoverDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderHandoverResponseDto"];
+                };
+            };
+        };
+    };
+    RiderHandoversController_listBalances_v1: {
+        parameters: {
+            query?: {
+                /** @description Search by rider name */
+                search?: string;
+                /** @description Only riders whose balance is not exactly 0.00 */
+                outstandingOnly?: boolean;
+                page?: components["schemas"]["Object"];
+                perPage?: components["schemas"]["Object"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderHandoverBalanceListResponseDto"];
+                };
+            };
+        };
+    };
+    RiderHandoversController_getAudit_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderHandoverAuditResponseDto"][];
+                };
+            };
+        };
+    };
+    RiderHandoversController_update_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRiderHandoverDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiderHandoverResponseDto"];
                 };
             };
         };

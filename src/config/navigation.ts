@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   MapPinned,
   Handshake,
+  HandCoins,
   LayoutDashboard,
   FileBarChart,
   ClipboardList,
@@ -64,7 +65,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Orders",
     items: [
       { to: "/orders", label: "Orders", icon: Package, permission: "orders.read" },
-      { to: "/orders/approval", label: "Approval queue", icon: ClipboardCheck, permission: "deliveries.approve" },
+      { to: "/orders/approval", label: "Confirm deliveries", icon: ClipboardCheck, permission: "deliveries.approve" },
+      { to: "/rider-handovers", label: "Rider handovers", icon: HandCoins, permission: "rider-handovers.read" },
     ],
   },
   {

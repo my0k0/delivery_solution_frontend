@@ -1,4 +1,4 @@
-# Business flows — per-order rider commission and shop settlement
+# Business flows — per-order rider commission, rider handovers, and shop settlement
 
 **Status:** as-built description of the system after the change from per-way commission to per-order rider commission. Written from the code, not from intent; every claim below is traceable to a file.
 
@@ -178,7 +178,7 @@ Which orders count, by figure:
 | Rider commission **pending** | `AWAITING_APPROVAL` only |
 | **Every** payable figure | `CANCELLED` contributes 0 |
 
-Editing any field is gated by `orders.update`. An order that has **ended** — `DELIVERED` or `CANCELLED` — is immutable: `PATCH /orders/:id` answers 409, so a money figure can no longer be corrected on it. (`orders.update_after_approval` no longer unlocks an edit; it still guards the shop advance on a delivered order — §10.) Every changed field on an open order is written to `order_field_audit` with old value, new value, actor, and reason. Money fields are stored in the audit log as strings, so no precision is lost.
+Editing any field is gated by `orders.update`. An order that has **ended** — `DELIVERED` or `CANCELLED` — is immutable: `PATCH /orders/:id` answers 409, so a money figure can no longer be corrected on it. (`orders.update_after_approval` no longer unlocks an edit; it still guards the shop advance on a delivered order — §11.) Every changed field on an open order is written to `order_field_audit` with old value, new value, actor, and reason. Money fields are stored in the audit log as strings, so no precision is lost.
 
 Reading that log back is deliberately **not** a mirror of the columns. `GET /orders/:id/audit` resolves the identifier-valued fields (`shopId`, `customerId`, `townshipId`, `riderId`, `partnerId`) to the referenced record's name, so an office reader never has to interpret a uuid; the same applies to the order's own `shopName` / `customerName` / `townshipName` / `assigneeName` and to each history row's `changedByName`. This is not cosmetic: an OFFICER holds `orders.read` while `shops.read`, `customers.read`, and `riders.read` sit with ADMIN, so there is no lookup the officer's client could perform for itself. `actorId` and `changedBy` remain in the payload as ids for correlation and are never rendered.
 
@@ -208,11 +208,59 @@ What the rider sees: **My deliveries** (own `ASSIGNED` orders, with the COD to c
 
 ---
 
-## 10. Shop settlement — what exists today
+## 10. Rider → office: cash handovers — built 2026-10-20
+
+The money path has three legs, and until 2026-10-20 only two were represented: customer → rider (§4) and the company → shop advance (§11). What a rider does with the cash afterwards was invisible — `/reports/rider-collection` says what a rider **should** be holding, and nothing recorded what they actually handed back. `rider_handovers` closes that gap.
+
+### 10.1 What an officer records, and when
+
+`POST /rider-handovers` takes the rider, the amount, the **received method** (`KPAY` / `CASH` / `BANK_TRANSFER`), a required **received date** (`receivedOn`, a calendar date, never in the future), and an optional note. The actor is the authenticated officer who recorded it.
+
+The amount is what the rider handed over — **not** net of commission. Commission is paid with salary and sits outside the delivery system, so a handover is never reduced by it and a rider's balance never mixes the two.
+
+Timing is free: cash can be handed over the same day, days later, or before the related order is approved. The balance absorbs the order rather than the other way round.
+
+### 10.2 The balance, and what it counts
+
+`GET /rider-handovers/balances` returns one row per rider:
+
+- **`deliveredCod`** — the all-time COD of that rider's `DELIVERED` orders, from the same canonical `codToCollect` expression the reports use (§8), so it matches the reports for the same order set.
+- **`accepted`** — every handover ever recorded, whatever the method or date.
+- **`balance`** = `deliveredCod − accepted`, computed in Postgres `numeric` and returned as a decimal string.
+- **`oldestUnsettledDeliveredOn`** — on the convention that cash settles **oldest deliveries first**, the delivery date of the oldest delivery still carrying part of the balance. It is `null` when nothing is unsettled.
+
+Two deliberate choices:
+
+1. **`DELIVERED` only.** An order awaiting approval counts toward neither side. Cash is accepted only for deliveries the office has approved, so counting an unapproved order would keep every balance permanently positive and make a correct rider look short.
+2. **All-time, not date-ranged.** A balance does not reset because a report range did — which is exactly why it lives beside `/reports/rider-collection` rather than inside it.
+
+A negative balance is real and stays visible: the company holding rider cash is a normal state during an approval backlog, and `outstandingOnly` filters `balance <> 0` so neither direction disappears from the list.
+
+### 10.3 Corrections — edit in place, reason on record
+
+A mistyped figure is corrected with `PATCH /rider-handovers/:id`, never by deleting the row: there is **no delete endpoint** in the catalog. The edit requires a **reason**, writes each changed field to `rider_handover_audit` (old value, new value, actor, reason, timestamp) — the same treatment open order fields already get (§8) — and `GET /rider-handovers/:id/audit` returns the trail.
+
+A duplicate or reversed transfer is corrected down to `0.00` rather than removed, so "this was recorded and then cancelled" survives in the history instead of becoming a gap.
+
+### 10.4 What this deliberately is not
+
+- **Not a cash ledger.** It records one direction of one relationship — cash from a rider to the office — and nothing else.
+- **Not reconciliation.** Handovers are not matched against particular orders or particular notes. The balance is an aggregate, and the oldest-unsettled date is a settlement convention, not a claim about which notes changed hands.
+- **Not a write-off or an adjustment.** There is no opening balance and no cutover: every figure is the sum of rows in `rider_handovers`, so pre-live history cannot be represented and is not pretended.
+- **Not a rider-facing surface.** Riders neither see nor submit handovers; the office records what it received, exactly as it does for deliveries.
+- **Not the shop's money.** The company → shop axis (§11) is untouched.
+
+One entry-time guard sits in front of all of this, and it is a screen rule rather than an API rule: because cash can arrive before the matching order is approved, the outstanding amount sometimes understates what a rider has handed over, so the record dialog **confirms** an amount above the outstanding amount — naming the balance, the amount and the difference — instead of refusing it. `POST /rider-handovers` has no ceiling; the balance simply goes negative, which the balances table shows as "Company holds X". The guard exists because the same arithmetic is how a mistyped amount hides: a rider who still owes a lot absorbs the error as a plausible-looking smaller balance.
+
+Phase 6 — the payment ledger, reconciliation, and shop prepayments — stays blocked. This feature removes the easiest excuse for asking for it, not the reasons it is blocked.
+
+---
+
+## 11. Shop settlement — what exists today
 
 This is the area where the system is thinnest, so it is worth being blunt about what it does and does not hold.
 
-### 10.1 The only payment state the system knows
+### 11.1 The only payment state the system knows
 
 Two booleans on each order, set **by hand** by an officer when creating or editing the order (frontend: the "Already paid to shop" box with **Package price paid** / **Delivery fee paid** checkboxes):
 
@@ -223,9 +271,9 @@ They are covered combinations: both / price only / fee only / nothing.
 
 **Confirmed semantics (correct as built):** these two flags record **what the customer paid the shop in advance** — online-shop customers sometimes pay the package price and/or the delivery fee up front. When the customer prepaid, the rider collects nothing for those parts, so COD drops accordingly; when the customer is on COD, the rider collects package price + delivery fee.
 
-There is **no amount, no date, and no payment record** behind them, and — the important part — they say nothing about the **other direction**: the money the delivery company itself pays the shop. That is a separate axis with no representation at all (see §11).
+There is **no amount, no date, and no payment record** behind them, and — the important part — they say nothing about the **other direction**: the money the delivery company itself pays the shop. That is a separate axis with no representation at all (see §12).
 
-### 10.2 Where an officer can see payment state
+### 11.2 Where an officer can see payment state
 
 | Surface | What it shows | Can you tell prepaid from it? |
 |---|---|---|
@@ -240,9 +288,9 @@ The shop statement page carries an explicit warning, which is the most honest su
 
 > "Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. Net owed to shop can be negative: positive means the company owes the shop; negative means the shop owes the company. “Advanced to shop” counts advances by the date they were recorded, not by the order's entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields — the system keeps no record of cash actually received, so treat COD as an expectation, not a settled balance."
 
-### 10.3 What is missing
+### 11.3 What is missing
 
-> **Status note (2026-10-18).** This list is the gap **as it stood before Phase 1**. Phase 1 closed the advance record (1), the prepaid/advance filters (3), and the separation of the two money directions (4) — see §11.3. A cross-shop register (2) is closer but still only the orders report plus its `shopAdvance` filter, with no dedicated screen. Settlement events (5) remain open, and the **reclaim** — the whole subject of §11 — is still unbuilt.
+> **Status note (2026-10-18).** This list is the gap **as it stood before Phase 1**. Phase 1 closed the advance record (1), the prepaid/advance filters (3), and the separation of the two money directions (4) — see §12.3. A cross-shop register (2) is closer but still only the orders report plus its `shopAdvance` filter, with no dedicated screen. Settlement events (5) remain open, and the **reclaim** — the whole subject of §12 — is still unbuilt.
 
 - **No company→shop payment record.** Nothing records that the company paid a shop, when, or how much. No `payments`/`prepayments` table, no shop balance column, no advance row. (v2 §2 decision 22 keeps "payment ledger, reconciliation, prepayments to shops" deliberately **blocked**.)
 - **No cross-shop register.** There is no screen answering "which orders for which shop have been advanced and which have not".
@@ -252,9 +300,9 @@ The shop statement page carries an explicit warning, which is the most honest su
 
 ---
 
-## 11. The uncovered case: undeliverable order → return to shop → reclaim
+## 12. The uncovered case: undeliverable order → return to shop → reclaim
 
-### 11.1 The business event
+### 12.1 The business event
 
 A **COD** order is entered: the customer will pay the rider package price + delivery fee. Because the customer has not paid the shop, the **company advances the shop the package price** — deliberately the package price only, not the delivery fee. The package then fails to deliver: the recipient cancels through the shop, the address is unreachable, the customer refuses. The package must go **back to the shop**, and the company must get the **advanced package price back** from the shop — unless that particular order had not been advanced yet.
 
@@ -263,7 +311,7 @@ Note the two directions, which the system keeps apart for the first time in this
 - **Customer → shop** (modelled): whether the customer prepaid. Drives COD.
 - **Company → shop** (not modelled): the advance the company pays the shop. Drives settlement and the reclaim.
 
-### 11.2 Why the current system cannot express it
+### 12.2 Why the current system cannot express it
 
 1. **There is no return event.** Cancelling puts the order in the single terminal `CANCELLED` state with a free-text reason. The system cannot distinguish "called off, never dispatched" from "package physically returned to the shop". Nothing records that the package is back in the shop's hands.
 2. **The money vanishes instead of reversing.** `CANCELLED` contributes `0` to every payable figure. So the moment an order is cancelled, the fact that the company is out of pocket the package price disappears from every report. The reclaim obligation — the shop owing the company `P` — is not just untracked, it is actively *not shown*.
@@ -271,7 +319,7 @@ Note the two directions, which the system keeps apart for the first time in this
 4. **The advance is now recorded — closed 2026-10-18 (Phase 1).** `orders.shopAdvanceAmount` / `shopAdvancedAt` record whether the company has paid the shop for this order, when, and how much, so `net owed to shop` subtracts it. What is still missing is the **reclaim**: nothing records that an advanced package came back, so the shop's debt back to the company is still underivable.
 5. **The shop's own view hides it too.** The shop's statement excludes cancelled orders from its settlement cards, so neither side sees the outstanding reclaim.
 
-### 11.3 Recommended shape — **Phase 1 built 2026-10-18; Phase 2 not built**
+### 12.3 Recommended shape — **Phase 1 built 2026-10-18; Phase 2 not built**
 
 Recorded as a design: `docs/superpowers/specs/2026-10-18-shop-advance-and-returns-design.md`. The business owner has ruled on the open questions and split the work in two phases. **Phase 1 is now implemented in both repos** (2026-10-18) — the `POST`/`DELETE /orders/:id/shop-advance` endpoints, the `orders.shopAdvanceAmount` / `shopAdvancedAt` columns, the `− shopAdvanceAmount` net-owed term, the `shopAdvance` filter, the order-detail advance block, and the statement/report columns. **Phase 2 is not.**
 
@@ -288,22 +336,22 @@ Recorded as a design: `docs/superpowers/specs/2026-10-18-shop-advance-and-return
 6. **Derive the reclaim** as `shopAdvanceAmount − reclaimSettledAmount` on a `CANCELLED` order **recorded as returned to the shop**. The trigger is the **physical hand-back, not the cancellation** — because an order is only created once the package reaches the office, a cancelled-but-unreturned order still has goods in the company's hands, so the shop owes nothing back yet. That makes the return step part of the cancel flow rather than an optional extra. Recovery is by **netting against the next advance**, so the settlement is an **amount** — a reclaim can be given back in instalments. No new ledger table; Phase 6 stays blocked.
 7. **Show it, rather than weakening the payable definitions:** a "returns — owed back by shop" line on the shop statement, "owed back by shops" on the office dashboard, and — for the shop itself — its reclaim obligations **with the reason each one exists**.
 
-**One hole Phase 1 does not close, deliberately:** Phase 1 can record neither the return nor the reclaim, and it keeps `CANCELLED` contributing `0` to every payable figure — so an advanced-then-cancelled order shows its advance nowhere. Because an order only exists once the package is at the office, every cancellation needs a hand-back, which makes this the **common** path rather than an edge case. It is the original motivating scenario, so Phase 1 must not be mistaken for "returns are handled": it answers *"which orders are not yet advanced?"*, not *"what do the shops owe us back?"*
+**One hole Phase 1 does not close, deliberately:** Phase 1 can record neither the return nor the reclaim, and it keeps `CANCELLED` contributing `0` to every payable figure — so an advanced-then-cancelled order shows its advance in no payable *total* (the order detail does name it: the Shop advance block reports the advance as money the shop owes back, and the orders list carries the same badge). Because an order only exists once the package is at the office, every cancellation needs a hand-back, which makes this the **common** path rather than an edge case. It is the original motivating scenario, so Phase 1 must not be mistaken for "returns are handled": it answers *"which orders are not yet advanced?"*, not *"what do the shops owe us back?"*
 
 Still open, for the client: whether a return also reclaims a **delivery fee** the shop collected from the customer for a delivery that never happened.
 
 ---
 
-## 12. Defects found while writing this
+## 13. Defects found while writing this
 
 Not caused by the commission change, and unrelated to it. Item 1 was a real defect, now **fixed**; item 2 turned out never to be one.
 
 1. ~~**Office shop statement shows two blank cards.**~~ **Fixed 2026-10-18.** The office DTO was renamed `OfficeShopStatementResponseDto`, so the two classes no longer collide and the generated frontend type resolves to the office shape. The page now reads the counts its endpoint actually returns, and its four tiles are relabelled Pending / Assigned / Delivered / Cancelled (the `awaitingApprovalCount` tile was dropped). The original note, kept for context: two different DTO classes shared the name `ShopStatementResponseDto` — and the generated frontend type took the shop-portal shape, so the office page read `receivedCount` / `outForDeliveryCount`, which the office endpoint never returns. Verified live at the time on `/reports/shop-statement`: the four status cards rendered `["", "", "3", "5"]` — **"Received" and "Out for delivery" were blank**.
-2. **Superseded — the COD formula is correct.** An earlier draft suspected `isPackagePaidToShop` was being used to mean the company's advance and that COD was therefore under-collected. Confirmed wrong (see §13). No defect.
+2. **Superseded — the COD formula is correct.** An earlier draft suspected `isPackagePaidToShop` was being used to mean the company's advance and that COD was therefore under-collected. Confirmed wrong (see §14). No defect.
 
 ---
 
-## 13. Resolved: what each flag means, and what is genuinely missing
+## 14. Resolved: what each flag means, and what is genuinely missing
 
 This section replaces an earlier open question. **Confirmed with the business owner:**
 
@@ -316,6 +364,6 @@ This section replaces an earlier open question. **Confirmed with the business ow
   - the customer prepaid the package price and/or the delivery fee → the rider collects nothing for those parts;
   - the customer is on COD → the rider collects package price + delivery fee.
 
-- The **company → shop** relation is real and separate: on a COD order the company **advances the shop the package price** — deliberately not the delivery fee. As of 2026-10-18 the **advance** is recorded (`orders.shopAdvanceAmount` / `shopAdvancedAt`, Phase 1); the **return** and the **reclaim** are still not represented — see §11.
+- The **company → shop** relation is real and separate: on a COD order the company **advances the shop the package price** — deliberately not the delivery fee. As of 2026-10-18 the **advance** is recorded (`orders.shopAdvanceAmount` / `shopAdvancedAt`, Phase 1); the **return** and the **reclaim** are still not represented — see §12.
 
 So there is no defect in the COD arithmetic and no need to reinterpret the existing flags. What is missing is a **new axis**, not a fix to an old one. The earlier suspicion that the prepaid flag was standing in for the company's advance — and that COD was therefore under-collected — was **wrong**; it is recorded here only so the reasoning isn't repeated.

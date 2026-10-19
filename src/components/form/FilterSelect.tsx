@@ -60,9 +60,16 @@ export function FilterSelect<TValue extends string>({
     <Select
       items={items}
       value={value ?? ''}
-      aria-label={ariaLabel ?? placeholder}      onValueChange={(next) => onChange(next !== null && isValue(next) ? next : undefined)}
+      onValueChange={(next) => onChange(next !== null && isValue(next) ? next : undefined)}
     >
-      <SelectTrigger className={className ?? 'w-[140px]'}>
+      {/*
+        The label belongs on the trigger, not on the Select root: Base UI renders
+        the root as no element at all, so an `aria-label` passed there never
+        reaches the DOM and the trigger was left with only its placeholder text as
+        a name. `placeholder` remains the fallback, which is at least the visible
+        text, but a caller's `aria-label` wins.
+      */}
+      <SelectTrigger className={className ?? 'w-[140px]'} aria-label={ariaLabel ?? placeholder}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

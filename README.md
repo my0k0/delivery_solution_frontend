@@ -6,8 +6,8 @@ Vite + React + TypeScript operations SPA for the Delivery Solution API (`../deli
 
 - Authentication, user and role management, and role-permission grants.
 - Shop, customer, rider, township, and delivery-partner administration.
-- Ways and rider commission: per-way rate, optional rider override, pay-anyway override.
-- Office order management: creation with a township default assignee or an explicit rider/partner, audited editing, assignment, postponement, cancel, the approval queue, send-back, and partner mark-delivered.
+- Rider commission: per order, prefilled from the township's required `defaultCommissionFee` and overridable per order.
+- Office order management: creation with an optional explicit rider or delivery partner, audited editing, assignment, postponement, cancel, the approval queue, send-back, and partner mark-delivered.
 - Office and rider reports: order report, shop statement, rider collection, rider payout, and the office dashboard, with CSV/XLSX export.
 - Rider surface: own-order delivery board and an assignment-date dashboard.
 - Shop portal: shop-scoped order list, order detail, dashboard, and statement exports.
@@ -39,13 +39,13 @@ The Vite server proxies `/api` to the backend. Seed credentials and database set
 pnpm codegen
 ```
 
-`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 13 modules / 42 keys; townships and delivery partners have their own `townships.*` / `partners.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
+`src/types/permission.ts` is the frontend mirror of the fixed backend permission catalog. The catalog has 14 modules / 46 keys; townships, delivery partners, and rider handovers have their own `townships.*` / `partners.*` / `rider-handovers.*` permissions, and riders receive `deliveries.read` / `deliveries.update` for their own surface.
 
 ## Order workflow
 
-- Office staff register an order after the package arrives at the office. Creation requires a township and a shop/customer, and takes an assignee: an explicit rider or delivery partner, or the township default. A township with no default assignee leaves the order `PENDING`.
-- Each township carries a `defaultDeliveryFee` and a `leadTimeDays`. Selecting a township prefills the order’s editable fee (overridable per order) and the estimated delivery date.
-- Townships and riders are independent; riders have no township coverage. A township may name a default assignee, and one rider can cover many townships.
+- Office staff register an order after the package arrives at the office. Creation requires a township and a shop/customer, and takes an optional explicit rider or delivery partner. With neither, the order stays `PENDING` — a township never supplies an assignee.
+- Each township carries a required `defaultDeliveryFee`, `defaultCommissionFee` and integer `leadTimeDays`. Selecting a township prefills the order’s editable fee and commission (both overridable per order) and the estimated delivery date.
+- Townships and riders are independent in both directions: riders have no township coverage, and a township carries no assignee and no coverage list. One rider can cover many townships.
 - Order edits are audited field-by-field and require `orders.update`. An order that has ended (`DELIVERED`, `CANCELLED`) cannot be edited at all, so there are no post-approval money edits; the shop advance on a delivered order still needs `orders.update_after_approval` and a reason.
 - Riders submit an assigned order as delivered (`AWAITING_APPROVAL`); an officer approves it or sends it back. Partner orders are marked delivered by an officer directly.
 - Riders are routed to `/rider-board` (with `/rider-dashboard`) inside the office shell and see only their own orders. The board uses `YYYY-MM-DD` in the office timezone and defaults to `Asia/Yangon`.

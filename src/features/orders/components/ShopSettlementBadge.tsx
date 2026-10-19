@@ -17,7 +17,12 @@ const SHOP_SETTLEMENT_LABELS: Record<ShopSettlementState, string> = {
   SHOP_OWES_COMPANY: 'Shop owes company',
 }
 
-/** `null` keeps the quiet secondary badge: the ordinary state needs no colour. */
+/**
+ * `null` keeps the quiet secondary badge. `UNPAID` and `CUSTOMER_PAID` are the
+ * ordinary cases — no advance recorded yet, or nothing owed at all — so colour
+ * there would make the normal row look like an alert; `PAID` and the two states
+ * where money is outstanding or held get one.
+ */
 const SHOP_SETTLEMENT_TONES: Record<ShopSettlementState, BadgeTone | null> = {
   PAID: 'positive',
   PARTLY_PAID: 'warning',
@@ -65,18 +70,39 @@ function describeSettlement(order: ShopSettlementBadgeProps['order'], settlement
   return `The shop holds company money: net owed to the shop is ${netOwed}.${deductedFeeNote}`
 }
 
+/**
+ * The state alone does not say how much is outstanding, so the two states where
+ * that number is the point of reading the cell print it beside the label. The
+ * rest keep the label only — an inline amount costs no row height, where a
+ * second line under every row would.
+ */
+function settlementAmount(settlement: ShopSettlement): string {
+  if (settlement.state === 'PARTLY_PAID') return formatDecimalAmount(settlement.netOwedToShop)
+  if (settlement.state === 'SHOP_OWES_COMPANY') return formatDecimalAmount(settlement.amountHeldByShop)
+  return ''
+}
+
 export function ShopSettlementBadge({ order }: ShopSettlementBadgeProps) {
   const settlement = calculateShopSettlement(order)
   const description = describeSettlement(order, settlement)
   // A cancelled order has no settlement to report and the Status column already
   // says why, so it shows a quiet dash rather than a pill that says nothing.
+  // The dash is not just decoration, so the reason is repeated for screen
+  // readers — `title` alone is hover-only.
   if (settlement.state === 'NOTHING_PAYABLE') {
-    return <span className="text-muted-foreground" title={description}>—</span>
+    return (
+      <span className="text-muted-foreground" title={description}>
+        —<span className="sr-only"> {description}</span>
+      </span>
+    )
   }
   const tone = SHOP_SETTLEMENT_TONES[settlement.state]
+  const amount = settlementAmount(settlement)
   return (
     <Badge variant="secondary" className={tone ? badgeClass(tone) : undefined} title={description}>
       {SHOP_SETTLEMENT_LABELS[settlement.state]}
+      {amount && <span className="font-mono font-normal"> · {amount}</span>}
+      <span className="sr-only">. {description}</span>
     </Badge>
   )
 }

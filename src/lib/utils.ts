@@ -30,6 +30,20 @@ export function formatDate(value: string): string {
 }
 
 /**
+ * `12 Sep 2026, 4:05 PM`-style date and time, for surfaces where the moment a
+ * row was written matters (a correction trail), not just the day.
+ */
+export function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat('en', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+/**
  * Group the integer part of a decimal string for display, preserving the
  * fraction exactly as the API returned it (`12000.00` → `12,000.00`).
  * Display only — never feed the result back into a calculation.

@@ -15,7 +15,7 @@ export function ApproveOrderDialog({ order, pending, onClose, onConfirm }: Appro
   return (
     <Dialog open={order !== null} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Approve delivered order?</DialogTitle><DialogDescription>Confirm delivery for {order?.trackingCode}. COD is counted as received only after approval.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Approve delivered order?</DialogTitle><DialogDescription>Confirm delivery for {order?.trackingCode}. This confirms the delivery; it does not record cash received — the COD becomes expected back from the rider.</DialogDescription></DialogHeader>
         <DialogFooter><Button type="button" variant="outline" onClick={onClose}>Review later</Button>{canApproveDelivery && <Button type="button" disabled={pending} onClick={() => void onConfirm()}>{pending ? 'Approving…' : 'Approve delivery'}</Button>}</DialogFooter>
       </DialogContent>
     </Dialog>
