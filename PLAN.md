@@ -44,10 +44,10 @@ This plan tracks office, shop, and rider UI work against the API contract in `..
 ### Metric limitations
 
 - COD and net owed to shop are **derived** from `packagePrice`, `deliveryFee`, `isPackagePaidToShop` and `isFeePaidToShop`. They are expectations, not evidence of a cash collection. Do not display COD sums as “collected”, “reconciled”, or “payable”. (`orders.codAmount` is still in the schema but is not read by application code.)
-- Approval (`DELIVERED`) confirms the delivery and starts expecting the COD back from the rider — it records no cash. There is no rider remittance record, so no screen may claim money has been handed over or received.
+- Approval (`DELIVERED`) confirms the delivery and starts expecting the COD back from the rider — it records no cash itself. A **rider handover** is the one record of cash actually received: it is per rider and aggregate, never allocated to an order, so it settles that rider's balance without turning any order's COD into a "collected" figure.
 - No promised delivery time or delivery-start timestamp exists, so on-time rate, transit time, and any delivery-attempt success rate cannot be computed. `estimatedDeliveryDate` is an office-set target date, and `deliveredAt` is stamped when the rider submits, before an officer has checked anything.
 - Daily rider sign-out/sign-in, custody returns, shifts/manifests, and the 5-of-10 rule are deferred; do not show custody metrics.
-- Refunds, payment reconciliation, rider remittance, and shop payouts remain blocked pending Phase 6 domain decisions. The separate order "returns" concept no longer exists — it was merged into the single `CANCELLED` state.
+- Refunds, payment reconciliation, and shop payouts remain blocked pending Phase 6 domain decisions. Rider handovers are a receipt record, not reconciliation: the running balance reconciles against no order. The separate order "returns" concept no longer exists — it was merged into the single `CANCELLED` state.
 - Township is an order attribute, not a shop attribute; do not imply a shop-township relation.
 
 ### Dependencies and implementation gate

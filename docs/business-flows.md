@@ -284,9 +284,9 @@ There is **no amount, no date, and no payment record** behind them, and — the 
 | Shop statement (`/reports/shop-statement`) | Per shop: price total, fee total, COD collected, COD expected, net owed · delivered, net owed · pending | Aggregated only |
 | Shop portal (shop's own view) | Per order: COD to collect, net settlement; plus statement cards | The API sends `isPackagePaidToShop`, but **the shop UI does not render it** |
 
-The shop statement page carries an explicit warning, which is the most honest summary of this whole area (**as built**, 2026-10-18):
+The shop statement page carries an explicit warning, which is the most honest summary of this whole area (**as built**, 2026-10-18; wording revised 2026-10-20, when rider handovers became the system's first record of cash actually received):
 
-> "Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. Net owed to shop can be negative: positive means the company owes the shop; negative means the shop owes the company. “Advanced to shop” counts advances by the date they were recorded, not by the order's entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields — the system keeps no record of cash actually received, so treat COD as an expectation, not a settled balance."
+> "Net owed to shop follows the delivery workflow money rules and subtracts any recorded shop advance. Net owed to shop can be negative: positive means the company owes the shop; negative means the shop owes the company. “Advanced to shop” counts advances by the date they were recorded, not by the order's entry or delivery date, so it does not line up with the counts and totals above. Apart from an advance, every figure here is derived from order fields. The office does record the cash riders hand in, on the rider handovers page, but per rider and never against an order or a shop — so treat COD as an expectation, not a settled balance."
 
 ### 11.3 What is missing
 
