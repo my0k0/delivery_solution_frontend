@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search } from 'lucide-react'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/EmptyState'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { usePermission } from '@/lib/auth/usePermission'
+import { useUrlFilters } from '@/lib/url/useUrlFilters'
 import { fetchRiders } from '@/features/riders/api'
 import { useShops } from '@/features/shops/api'
 import {
@@ -18,44 +19,61 @@ import {
   orderKeys,
   ORDER_STATUSES,
   type OrderBody,
-  type OrderDateBasis,
   type OrderFilters,
-  type OrderStatus,
   type ShopAdvanceFilter,
 } from '@/features/orders/api'
+import {
+  ORDERS_FILTER_SCHEMA,
+  ORDER_DATE_BASES,
+  PACKAGE_PAYMENT_FILTERS,
+  SHOP_ADVANCE_FILTERS,
+  toOrderDateBasis,
+  toOrderStatus,
+  toPackagePayment,
+  toShopAdvance,
+} from '@/features/orders/order-filters'
 import { calculateCodToCollect } from '@/features/orders/money'
-import { getTodayDate } from '@/features/reports/date-range'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { OrderSelectField } from '@/features/orders/components/OrderSelectField'
 import { ShopSettlementBadge } from '@/features/orders/components/ShopSettlementBadge'
 
 const PAGE_SIZE = 20
 
-const SHOP_ADVANCE_FILTER_OPTIONS: Array<{ value: ShopAdvanceFilter; label: string }> = [
-  { value: 'NOT_ADVANCED', label: 'Advance still due' },
-  { value: 'ADVANCED', label: 'Advanced' },
-]
+/** Labels for the tuples the URL schema owns — the values are never re-spelled here. */
+const SHOP_ADVANCE_LABELS: Record<ShopAdvanceFilter, string> = {
+  NOT_ADVANCED: 'Advance still due',
+  ADVANCED: 'Advanced',
+}
 
-const PACKAGE_PAYMENT_FILTER_OPTIONS = [
-  { value: 'false', label: 'Customer did not pay the shop' },
-  { value: 'true', label: 'Customer paid the shop' },
-]
+const SHOP_ADVANCE_FILTER_OPTIONS = SHOP_ADVANCE_FILTERS.map((value) => ({
+  value,
+  label: SHOP_ADVANCE_LABELS[value],
+}))
 
+const PACKAGE_PAYMENT_LABELS: Record<(typeof PACKAGE_PAYMENT_FILTERS)[number], string> = {
+  false: 'Customer did not pay the shop',
+  true: 'Customer paid the shop',
+}
+
+const PACKAGE_PAYMENT_FILTER_OPTIONS = PACKAGE_PAYMENT_FILTERS.map((value) => ({
+  value,
+  label: PACKAGE_PAYMENT_LABELS[value],
+}))
+
+const DATE_BASIS_OPTIONS = ORDER_DATE_BASES.map((basis) => ({
+  value: basis,
+  label: basis === 'ENTRY' ? 'Entry date' : 'Delivered date',
+}))
+
+/**
+ * Orders list. Every filter — including the page and the date range — lives in
+ * the URL, so opening an order and coming back restores the same view, the same
+ * page, and a warm React Query entry instead of a cold list.
+ */
 export function OrdersPage() {
   const canCreate = usePermission('orders.create')
   const navigate = useNavigate()
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [shopId, setShopId] = useState('')
-  const [townshipId, setTownshipId] = useState('')
-  const [assigneeId, setAssigneeId] = useState('')
-  const [shopAdvance, setShopAdvance] = useState('')
-  const [isPackagePaidToShop, setIsPackagePaidToShop] = useState('')
-  /** Local calendar date, not the UTC one: `toISOString()` reports yesterday's date for a Yangon morning. */
-  const [dateFrom, setDateFrom] = useState(() => getTodayDate())
-  const [dateTo, setDateTo] = useState(() => getTodayDate())
-  const [dateBasis, setDateBasis] = useState<OrderDateBasis>('ENTRY')
+  const { filters: values, update, reset, hasActiveFilters } = useUrlFilters(ORDERS_FILTER_SCHEMA)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const queryClient = useQueryClient()
   const shops = useShops({ page: 1, perPage: 100 })
@@ -63,18 +81,18 @@ export function OrdersPage() {
   const riders = useQuery({ queryKey: ['operations', 'riders', 'active'], queryFn: () => fetchRiders({ page: 1, perPage: 100, status: 'ACTIVE' }) })
   const partners = useQuery({ queryKey: orderKeys.partners, queryFn: fetchDeliveryPartners })
   const filters: OrderFilters = {
-    page,
+    page: values.page,
     perPage: PAGE_SIZE,
-    search: search.trim() || undefined,
-    status: status ? status as OrderStatus : undefined,
-    shopId: shopId || undefined,
-    townshipId: townshipId || undefined,
-    assigneeId: assigneeId || undefined,
-    shopAdvance: shopAdvance ? (shopAdvance as ShopAdvanceFilter) : undefined,
-    isPackagePaidToShop: isPackagePaidToShop === '' ? undefined : isPackagePaidToShop === 'true',
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    dateBasis,
+    search: values.search.trim() || undefined,
+    status: values.status || undefined,
+    shopId: values.shopId || undefined,
+    townshipId: values.townshipId || undefined,
+    assigneeId: values.assigneeId || undefined,
+    shopAdvance: values.shopAdvance || undefined,
+    isPackagePaidToShop: values.isPackagePaidToShop === '' ? undefined : values.isPackagePaidToShop === 'true',
+    dateFrom: values.dateFrom || undefined,
+    dateTo: values.dateTo || undefined,
+    dateBasis: values.dateBasis,
   }
   const orders = useQuery({ queryKey: orderKeys.list(filters), queryFn: () => fetchOrders(filters) })
   const createMutation = useMutation({
@@ -86,10 +104,16 @@ export function OrdersPage() {
     },
   })
 
-  function resetToFirstPage(update: () => void) {
-    setPage(1)
-    update()
-  }
+  // A remembered page can outlive the rows that filled it — someone cancels
+  // orders while you are away, and page 7 of 3 comes back empty. Fall back to
+  // the last real page instead of showing "No orders found".
+  const totalPages = orders.data?.meta.totalPages
+  useEffect(() => {
+    if (totalPages === undefined) return
+    if (values.page > Math.max(totalPages, 1)) {
+      update({ page: Math.max(totalPages, 1) }, { keepPage: true })
+    }
+  }, [totalPages, values.page, update])
 
   const assigneeOptions = [
     ...(riders.data?.data ?? []).map((rider) => ({ value: rider.id, label: `${rider.name} · Rider` })),
@@ -106,26 +130,34 @@ export function OrdersPage() {
         {canCreate && <Button onClick={() => setIsFormOpen(true)}><Plus className="size-4" />Create order</Button>}
       </div>
 
-      <section aria-label="Order filters" className="grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="relative flex flex-col gap-2">
-          <label htmlFor="order-search" className="text-sm font-medium">Search</label>
-          <Search className="absolute left-3 top-[2.55rem] size-4 text-muted-foreground" aria-hidden="true" />
-          <Input id="order-search" className="pl-9" value={search} placeholder="Tracking code, name, phone, address" onChange={(event) => resetToFirstPage(() => setSearch(event.target.value))} />
+      <section aria-label="Order filters" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-medium">Filters</h2>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={reset}>Reset filters</Button>
+          )}
         </div>
-        <OrderSelectField id="order-filter-status" label="Status" value={status} options={ORDER_STATUSES.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} placeholder="All statuses" onChange={(value) => resetToFirstPage(() => setStatus(value))} />
-        <OrderSelectField id="order-filter-shop" label="Shop" value={shopId} options={(shops.data?.data ?? []).map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="All shops" onChange={(value) => resetToFirstPage(() => setShopId(value))} />
-        <OrderSelectField id="order-filter-township" label="Township" value={townshipId} options={(townships.data ?? []).map((township) => ({ value: township.id, label: township.name }))} placeholder="All townships" onChange={(value) => resetToFirstPage(() => setTownshipId(value))} />
-        <OrderSelectField id="order-filter-assignee" label="Assignee" value={assigneeId} options={assigneeOptions} placeholder="All assignees" onChange={(value) => resetToFirstPage(() => setAssigneeId(value))} />
-        <OrderSelectField id="order-filter-shop-advance" label="Shop advance" value={shopAdvance} options={SHOP_ADVANCE_FILTER_OPTIONS} placeholder="Any advance state" onChange={(value) => resetToFirstPage(() => setShopAdvance(value))} />
-        <OrderSelectField id="order-filter-package-payment" label="Package payment" value={isPackagePaidToShop} options={PACKAGE_PAYMENT_FILTER_OPTIONS} placeholder="Any package payment" onChange={(value) => resetToFirstPage(() => setIsPackagePaidToShop(value))} />
-        <OrderSelectField id="order-date-basis" label="Date basis" value={dateBasis} options={[{ value: 'ENTRY', label: 'Entry date' }, { value: 'DELIVERED', label: 'Delivered date' }]} onChange={(value) => resetToFirstPage(() => setDateBasis(value as OrderDateBasis))} />
-        <div className="flex flex-col gap-2">
-          <label htmlFor="order-date-from" className="text-sm font-medium">From</label>
-          <Input id="order-date-from" type="date" value={dateFrom} onChange={(event) => resetToFirstPage(() => setDateFrom(event.target.value))} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <label htmlFor="order-date-to" className="text-sm font-medium">To</label>
-          <Input id="order-date-to" type="date" value={dateTo} onChange={(event) => resetToFirstPage(() => setDateTo(event.target.value))} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="relative flex flex-col gap-2">
+            <label htmlFor="order-search" className="text-sm font-medium">Search</label>
+            <Search className="absolute left-3 top-[2.55rem] size-4 text-muted-foreground" aria-hidden="true" />
+            <Input id="order-search" className="pl-9" value={values.search} placeholder="Tracking code, name, phone, address" onChange={(event) => update({ search: event.target.value })} />
+          </div>
+          <OrderSelectField id="order-filter-status" label="Status" value={values.status} options={ORDER_STATUSES.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} placeholder="All statuses" onChange={(value) => update({ status: toOrderStatus(value) })} />
+          <OrderSelectField id="order-filter-shop" label="Shop" value={values.shopId} options={(shops.data?.data ?? []).map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="All shops" onChange={(value) => update({ shopId: value })} />
+          <OrderSelectField id="order-filter-township" label="Township" value={values.townshipId} options={(townships.data ?? []).map((township) => ({ value: township.id, label: township.name }))} placeholder="All townships" onChange={(value) => update({ townshipId: value })} />
+          <OrderSelectField id="order-filter-assignee" label="Assignee" value={values.assigneeId} options={assigneeOptions} placeholder="All assignees" onChange={(value) => update({ assigneeId: value })} />
+          <OrderSelectField id="order-filter-shop-advance" label="Shop advance" value={values.shopAdvance} options={SHOP_ADVANCE_FILTER_OPTIONS} placeholder="Any advance state" onChange={(value) => update({ shopAdvance: toShopAdvance(value) })} />
+          <OrderSelectField id="order-filter-package-payment" label="Package payment" value={values.isPackagePaidToShop} options={PACKAGE_PAYMENT_FILTER_OPTIONS} placeholder="Any package payment" onChange={(value) => update({ isPackagePaidToShop: toPackagePayment(value) })} />
+          <OrderSelectField id="order-date-basis" label="Date basis" value={values.dateBasis} options={DATE_BASIS_OPTIONS} onChange={(value) => update({ dateBasis: toOrderDateBasis(value) })} />
+          <div className="flex flex-col gap-2">
+            <label htmlFor="order-date-from" className="text-sm font-medium">From</label>
+            <Input id="order-date-from" type="date" value={values.dateFrom} onChange={(event) => update({ dateFrom: event.target.value })} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="order-date-to" className="text-sm font-medium">To</label>
+            <Input id="order-date-to" type="date" value={values.dateTo} onChange={(event) => update({ dateTo: event.target.value })} />
+          </div>
         </div>
       </section>
 
@@ -159,8 +191,8 @@ export function OrdersPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>{orders.data.meta.total} orders · Page {orders.data.meta.page} of {Math.max(orders.data.meta.totalPages, 1)}</span>
             <div className="flex gap-2">
-              <Button variant="outline" disabled={page <= 1} onClick={() => setPage((currentPage) => currentPage - 1)}>Previous</Button>
-              <Button variant="outline" disabled={page >= orders.data.meta.totalPages} onClick={() => setPage((currentPage) => currentPage + 1)}>Next</Button>
+              <Button variant="outline" disabled={values.page <= 1} onClick={() => update({ page: values.page - 1 }, { keepPage: true })}>Previous</Button>
+              <Button variant="outline" disabled={values.page >= orders.data.meta.totalPages} onClick={() => update({ page: values.page + 1 }, { keepPage: true })}>Next</Button>
             </div>
           </div>
         </>
