@@ -280,7 +280,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit an owned order delivery for office approval */
+        /** Submit an owned order delivery for office approval, with photo evidence */
         post: operations["RidersController_submitDelivered_v1"];
         delete?: never;
         options?: never;
@@ -384,6 +384,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["OrdersController_history_v1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}/delivery-proofs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List delivery photo captures with short-lived signed URLs */
+        get: operations["OrdersController_deliveryProofs_v1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1483,6 +1500,36 @@ export interface components {
             newAssignee?: Record<string, never> | null;
             /** @example 2026-09-18T10:00:00.000Z */
             createdAt: string;
+        };
+        DeliveryProofResponseDto: {
+            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
+            id: string;
+            /**
+             * @description Short-lived signed GET URL. Minted per request and expires in 5 minutes; never stored.
+             * @example https://account.r2.cloudflarestorage.com/bucket/key?X-Amz-Expires=300
+             */
+            url: string;
+            /** @example image/jpeg */
+            contentType: string;
+            /** @example 245311 */
+            byteSize: number;
+            /** @example 2026-10-24T07:00:00.000Z */
+            capturedAt: string;
+            /**
+             * @description Snapshot of the capturer at capture time, so the attribution survives a deleted login.
+             * @example Rider Name
+             */
+            uploadedByName: string;
+            /**
+             * @description Set only when an officer accepted this capture as evidence.
+             * @example 2026-10-24T08:15:00.000Z
+             */
+            approvedAt?: Record<string, never> | null;
+            /**
+             * @description Snapshot of the approving officer at approval time, so a later rename or a deleted login cannot rewrite who accepted this capture. Null while unaccepted.
+             * @example Officer Name
+             */
+            approvedByName?: Record<string, never> | null;
         };
         AssignOrderDto: {
             riderId?: Record<string, never> | null;
@@ -2604,7 +2651,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    photo: string;
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2849,6 +2903,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderHistoryResponseDto"][];
+                };
+            };
+        };
+    };
+    OrdersController_deliveryProofs_v1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryProofResponseDto"][];
                 };
             };
         };
