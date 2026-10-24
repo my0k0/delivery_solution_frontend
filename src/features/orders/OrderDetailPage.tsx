@@ -34,6 +34,7 @@ import { calculateCodToCollect, calculateNetOwedToShop, NET_OWED_SIGN_NOTE } fro
 import { ShopSettlementBadge } from '@/features/orders/components/ShopSettlementBadge'
 import { OrderFormDialog } from '@/features/orders/OrderFormDialog'
 import { AssignOrderDialog } from '@/features/orders/AssignOrderDialog'
+import { DeliveryEvidenceSection } from '@/features/orders/DeliveryEvidenceSection'
 import { PostponeOrderDialog } from '@/features/orders/PostponeOrderDialog'
 import { CancelOrderDialog } from '@/features/orders/CancelOrderDialog'
 import { SendBackOrderDialog } from '@/features/orders/SendBackOrderDialog'
@@ -214,6 +215,13 @@ export function OrderDetailPage() {
         {order.cancelReason && <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Cancellation reason</p><p className="mt-1">{order.cancelReason}</p></div>}
         <p className="text-xs text-muted-foreground sm:col-span-2 xl:col-span-4">{NET_OWED_SIGN_NOTE}</p>
       </section>
+
+      <DeliveryEvidenceSection
+        orderId={order.id}
+        trackingCode={order.trackingCode}
+        status={order.status}
+        assigneeType={order.assigneeType ?? null}
+      />
 
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4" aria-label="Shop advance">
         <div className="flex flex-wrap items-start justify-between gap-3">

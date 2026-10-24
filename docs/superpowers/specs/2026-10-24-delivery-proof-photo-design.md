@@ -80,7 +80,8 @@ as JPEG (quality 0.8) before upload:
 
 - upload size drops from ~4 MB to ~250 KB on a mobile connection,
 - the re-encode strips EXIF, so **GPS coordinates the rider never agreed to share do
-  not leave the phone**,
+  not leave the phone** — this is a guarantee of the first-party client only, since the
+  server stores validated bytes as they arrive rather than re-encoding them,
 - and it normalises HEIC to JPEG, which the API would otherwise have to handle.
 
 Server-side limits are the real gate, not the client: max 5 MB, `image/jpeg`,
@@ -104,6 +105,7 @@ New table `order_delivery_proofs`:
 | `captured_at` | timestamptz not null, default now | |
 | `approved_at` | timestamptz null | set in the **approve** transaction |
 | `approved_by` | uuid → `users.id`, nullable, `on delete set null` | who accepted this photo as evidence |
+| `approved_by_name` | text null | **snapshot** of the approving officer, for the same reason as `uploaded_by_name` — an approval attribution must not follow a later rename or vanish with a deleted login |
 
 No column on `orders`. Rationale: `AWAITING_APPROVAL → ASSIGNED` (send-back) means an
 order can be submitted more than once, so a uniqueness constraint would be wrong; and
@@ -136,9 +138,11 @@ Consequences:
 This is the design's answer to anti-goal §4: the record cannot imply a proof was
 accepted when the office rejected it.
 
-Belt and braces on the invariant: with the override deferred, **every `DELIVERED` order
-has exactly one accepted proof**. That is a property the reports layer can rely on, and
-a test should assert it rather than trusting that no code path sneaks past.
+Belt and braces on the invariant: with the override deferred, **every order delivered
+through the rider flow has exactly one accepted proof**. Partner orders are marked
+delivered by the office and carry no capture at all, so the property is scoped to the
+rider flow — that is what makes it something the reports layer can rely on, and a test
+asserts it rather than trusting that no code path sneaks past.
 
 ### 5.4 API
 
@@ -147,9 +151,11 @@ All under `/api/v1`. Response and request types are regenerated into
 
 **A. `POST /riders/me/orders/:id/delivered`** — permission `deliveries.update`.
 Contract changes from JSON to `multipart/form-data` with a required `photo` file part.
-Answer stays `200` with `{ id, status, deliveredAt, proof: { id, capturedAt } }`.
+Answer stays `200` with `{ id, status, deliveredAt }` — the rider UI reads the transition,
+not the proof, so the response does not grow a nested class nothing consumes.
 Rejects with `400` when the part is missing or the bytes are not a permitted image, and
-with `404` when the order is not this rider's `ASSIGNED` order (existing behaviour).
+with `413` when the part exceeds the 5 MB limit (multer answers before the handler runs).
+`404` when the order is not this rider's `ASSIGNED` order (existing behaviour).
 Ordering: validate ownership and status → validate bytes and size → upload to R2 →
 transaction { insert proof row, apply `ASSIGNED → AWAITING_APPROVAL` } → on any failure
 after the upload, delete the just-written object. A failed transaction therefore leaves
@@ -198,8 +204,12 @@ deployment fails loudly instead of at the first delivery:
 
 `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`,
 `R2_KEY_PREFIX` (**required, no default** — e.g. `demo` in development and a distinct
-value in production), `R2_ENDPOINT` (optional; derived from the account id when absent),
-`DELIVERY_PROOF_MAX_BYTES` (optional, default `5242880`).
+value in production), `R2_ENDPOINT` (optional; derived from the account id when absent).
+
+The size ceiling is deliberately **not** configuration: `MAX_DELIVERY_PROOF_BYTES` is a
+code constant (`5 * 1024 * 1024`) in `src/storage/delivery-proof-file.ts`, used both by
+multer's limit and by the service's own check. A deployment cannot quietly raise it, and
+there is no second source of truth for the number the rider's dialog quotes.
 
 Object keys: `{R2_KEY_PREFIX}/delivery-proofs/{orderId}/{proofId}.{ext}`, e.g.
 `demo/delivery-proofs/8f1c…/b93a….jpg`. A shared bucket is fine because the prefix is
@@ -227,8 +237,9 @@ done from inside the repositories.
 
 `src/features/orders/api.ts` gains `submitRiderDelivered(orderId, file)` building a
 `FormData`, `fetchDeliveryProofs(orderId)`, and `orderKeys.proofs(orderId)`; the
-`delivered` mutation invalidates `orderKeys.riderBoard`, `orderKeys.detail(orderId)` and
-`orderKeys.proofs(orderId)`.
+`delivered` mutation invalidates `orderKeys.riderBoard`, which is the only query mounted
+on a rider screen. The office side refreshes itself: approval already invalidates the
+order detail, so nothing has to reach across the role boundary.
 
 | Where | Change |
 |---|---|
@@ -243,8 +254,8 @@ No new dependencies in the frontend. Downscaling uses `canvas` and `createImageB
 
 - `src/storage/storage.service.ts` + `storage.module.ts` — the only place that imports
   `@aws-sdk/client-s3`. Exposes `putObject`, `deleteObject`, `signedGetUrl`.
-- `src/storage/image-validation.ts` — byte-signature sniffing and the size/type gate,
-  unit-tested on its own.
+- `src/storage/delivery-proof-file.ts` — byte-signature sniffing, the size constant, and
+  the object-key builder; pure functions, unit-tested on their own.
 - `src/orders/order-delivery-proof.schema.ts` — the table, exported through
   `src/common/database/schema.ts`.
 - Drizzle migration generated with `pnpm db:generate` (`0023_*`).
@@ -257,7 +268,8 @@ No new dependencies in the frontend. Downscaling uses `canvas` and `createImageB
 | Situation | Result |
 |---|---|
 | Rider taps submit with no photo | submit disabled; server also 400s |
-| Photo over 5 MB or wrong bytes | 400, message names the limit; nothing stored |
+| Wrong bytes (not JPEG/PNG/WebP) | 400, message names the accepted types; nothing stored |
+| Photo over 5 MB | 413 from multer's limit; nothing stored |
 | R2 unreachable during upload | 502-ish error surfaced in the dialog, order stays `ASSIGNED`, rider retries |
 | R2 upload succeeds, transaction fails | the object is deleted, order stays `ASSIGNED` |
 | Rider re-submits after a send-back | second proof row; the older one stays labelled not-accepted |

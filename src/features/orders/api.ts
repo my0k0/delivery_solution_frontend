@@ -82,6 +82,23 @@ export type OrderAuditEntry = Omit<GeneratedAuditEntry, 'oldValue' | 'newValue' 
   reason: string | null
 }
 
+/**
+ * A photo captured with a delivery.
+ *
+ * `approvedAt` is what separates evidence from a capture that was rejected: a
+ * sent-back submission keeps its row but never gets stamped, so a screen must
+ * key "this proves the delivery" off `approvedAt`, never off list position.
+ */
+type GeneratedDeliveryProof = components['schemas']['DeliveryProofResponseDto']
+export type DeliveryProof = Omit<GeneratedDeliveryProof, 'approvedAt' | 'approvedByName'> & {
+  /** Codegen emits `Record<string, never>` stubs for these nullable fields; type them properly. */
+  approvedAt: string | null
+  approvedByName: string | null
+}
+
+/** What the rider's submit returns — the transition, not the proof. */
+export type RiderDelivered = components['schemas']['RiderDeliveredResponseDto']
+
 type GeneratedOrderList = components['schemas']['OrderListResponseDto']
 export type Page<T> = Omit<GeneratedOrderList, 'data'> & { data: T[] }
 
@@ -148,6 +165,7 @@ export const orderKeys = {
   list: (filters: OrderFilters) => ['workflow-orders', 'list', filters] as const,
   detail: (orderId: string) => ['workflow-orders', 'detail', orderId] as const,
   audit: (orderId: string) => ['workflow-orders', 'audit', orderId] as const,
+  proofs: (orderId: string) => ['workflow-orders', 'proofs', orderId] as const,
   townships: ['workflow-townships'] as const,
   partners: ['workflow-partners'] as const,
   riderBoard: ['workflow-rider-board'] as const,
@@ -163,6 +181,15 @@ export async function fetchOrder(orderId: string): Promise<OrderDetail> {
 
 export async function fetchOrderAudit(orderId: string): Promise<OrderAuditEntry[]> {
   return (await http.get<OrderAuditEntry[]>(`/orders/${orderId}/audit`)).data
+}
+
+/**
+ * Every capture recorded for this order, newest first, each with a signed URL
+ * that expires five minutes after it was minted — so this is refetched rather
+ * than cached and reused.
+ */
+export async function fetchDeliveryProofs(orderId: string): Promise<DeliveryProof[]> {
+  return (await http.get<DeliveryProof[]>(`/orders/${orderId}/delivery-proofs`)).data
 }
 
 export async function createOrder(body: OrderBody): Promise<Order> {
@@ -230,6 +257,9 @@ export async function fetchRiderBoard(): Promise<RiderBoardResponse> {
   return (await http.get<RiderBoardResponse>('/riders/me/orders')).data
 }
 
-export async function submitRiderDelivered(orderId: string): Promise<{ id: string; status: OrderStatus; deliveredAt: string }> {
-  return (await http.post<{ id: string; status: OrderStatus; deliveredAt: string }>(`/riders/me/orders/${orderId}/delivered`)).data
+export async function submitRiderDelivered(orderId: string, photo: File): Promise<RiderDelivered> {
+  const body = new FormData()
+  body.append('photo', photo)
+  // No Content-Type here: axios sets `multipart/form-data` and adds the boundary itself.
+  return (await http.post<RiderDelivered>(`/riders/me/orders/${orderId}/delivered`, body)).data
 }
