@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { usePermission } from '@/lib/auth/usePermission'
+import { useUrlFilters } from '@/lib/url/useUrlFilters'
 import type { RiderHandover, RiderHandoverBalance } from './api'
+import { HANDOVER_FILTER_SCHEMA } from './handover-filters'
 import { HandoverBalancesSection } from './components/HandoverBalancesSection'
 import { HandoverDialog } from './components/HandoverDialog'
 import { HandoverHistorySection } from './components/HandoverHistorySection'
@@ -24,6 +26,9 @@ export function RiderHandoversPage() {
   const [sourceRow, setSourceRow] = useState<RiderHandoverBalance>()
   const canCreate = usePermission('rider-handovers.create')
   const canUpdate = usePermission('rider-handovers.update')
+  // One owner of the URL for both sections: two independent filter stores would
+  // each rewrite the whole query string and delete the other's params.
+  const { filters, update } = useUrlFilters(HANDOVER_FILTER_SCHEMA)
 
   function openRecordDialog(balance: RiderHandoverBalance) {
     setHandoverToCorrect(undefined)
@@ -53,9 +58,29 @@ export function RiderHandoversPage() {
         </p>
       </div>
 
-      <HandoverBalancesSection canCreate={canCreate} onRecord={openRecordDialog} />
+      <HandoverBalancesSection
+        canCreate={canCreate}
+        onRecord={openRecordDialog}
+        values={{
+          balancePage: filters.balancePage,
+          balanceSearch: filters.balanceSearch,
+          outstandingOnly: filters.outstandingOnly,
+        }}
+        onChange={update}
+      />
 
-      <HandoverHistorySection canUpdate={canUpdate} onCorrect={openCorrectDialog} />
+      <HandoverHistorySection
+        canUpdate={canUpdate}
+        onCorrect={openCorrectDialog}
+        values={{
+          page: filters.page,
+          riderId: filters.riderId,
+          method: filters.method,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
+        }}
+        onChange={update}
+      />
 
       <HandoverDialog
         open={isDialogOpen}
