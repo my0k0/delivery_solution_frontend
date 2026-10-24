@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '@/lib/api/client'
 import { login } from '@/features/auth/api'
 import { loginSchema, type LoginValues } from '@/features/auth/validations'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { forgetAllListQueries } from '@/lib/url/list-query-memory'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +42,10 @@ export function LoginPage() {
     setIsSubmitting(true)
     try {
       const response = await login(data)
+      // A new sign-in starts from clean defaults, even if this tab belonged to
+      // someone else a moment ago. `clearSession` covers logout and 401; this
+      // covers a login that did not pass through either.
+      forgetAllListQueries()
       setSession(response.user, response.permissions, response.accessToken)
       navigate(from, { replace: true })
     } catch (err) {

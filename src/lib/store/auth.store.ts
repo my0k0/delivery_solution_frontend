@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { forgetAllListQueries } from '@/lib/url/list-query-memory'
 import type { components } from '@/types/api'
 import type { PermissionKey } from '@/types/permission'
 
@@ -36,7 +37,15 @@ export const useAuthStore = create<AuthState>()(
       permissions: [],
       setSession: (user, permissions, token) =>
         set({ user, permissions, token }),
-      clearSession: () => set({ token: null, user: null, permissions: [] }),
+      clearSession: () => {
+        // Session teardown (logout, 401, password change) also drops the
+        // remembered list views, so the next user in this tab never inherits
+        // the last one's filters. Deliberately NOT in `setSession`: the boot
+        // restore and the permission refresh both call that, and it would wipe
+        // the filters on every reload.
+        forgetAllListQueries()
+        set({ token: null, user: null, permissions: [] })
+      },
       hasPermission: (name) => {
         const { user, permissions } = get()
         if (isOwner(user)) return true

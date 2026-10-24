@@ -11,6 +11,7 @@ import {
   type NavItem,
 } from '@/config/navigation'
 import { Button } from '@/components/ui/button'
+import { useListQuery } from '@/lib/url/list-query-memory'
 
 interface SidebarProps {
   open: boolean
@@ -19,10 +20,18 @@ interface SidebarProps {
 
 function SidebarNavLink({ item, nested }: { item: NavItem; nested: boolean }) {
   const Icon = item.icon
+  // A destination carries the last filtered view of that list, if there was
+  // one. The URL alone cannot restore it: this link points at `/orders` with no
+  // query, so leaving Orders for another menu and clicking back would drop the
+  // filters the officer just set. Subscribed rather than read at render time —
+  // the memory is written from an effect, so a plain read goes one filter
+  // change behind and clicking the link would drop that change. `end` still
+  // matches on the pathname, so the active state ignores the query string.
+  const rememberedQuery = useListQuery(item.to)
   // All destinations are exact matches (end) — consistent active state.
   return (
     <NavLink
-      to={item.to}
+      to={`${item.to}${rememberedQuery}`}
       end
       className={({ isActive }) =>
         cn(

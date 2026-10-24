@@ -37,6 +37,7 @@ import { AssignOrderDialog } from '@/features/orders/AssignOrderDialog'
 import { PostponeOrderDialog } from '@/features/orders/PostponeOrderDialog'
 import { CancelOrderDialog } from '@/features/orders/CancelOrderDialog'
 import { SendBackOrderDialog } from '@/features/orders/SendBackOrderDialog'
+import { useListPath } from '@/lib/url/list-query-memory'
 import { ApproveOrderDialog } from '@/features/orders/ApproveOrderDialog'
 import { MarkDeliveredDialog } from '@/features/orders/MarkDeliveredDialog'
 import { RecordShopAdvanceDialog } from '@/features/orders/RecordShopAdvanceDialog'
@@ -108,6 +109,9 @@ export function OrderDetailPage() {
   const { orderId = '' } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  // Where "Back to orders" goes: the list the officer came from, filters and page
+  // included. A bare `/orders` would drop both.
+  const ordersListPath = useListPath('/orders')
   const canUpdate = usePermission('orders.update')
   const canCancel = usePermission('orders.cancel')
   const canApprove = usePermission('deliveries.approve')
@@ -168,7 +172,7 @@ export function OrderDetailPage() {
   }
 
   if (orderQuery.isLoading) return <div className="h-72 animate-pulse rounded-lg bg-muted" aria-label="Loading order details" />
-  if (orderQuery.isError || !order) return <div className="flex flex-col gap-3"><p role="alert" className="text-sm text-destructive">{getApiErrorMessage(orderQuery.error)}</p><Button variant="outline" onClick={() => navigate('/orders')}>Back to orders</Button></div>
+  if (orderQuery.isError || !order) return <div className="flex flex-col gap-3"><p role="alert" className="text-sm text-destructive">{getApiErrorMessage(orderQuery.error)}</p><Button variant="outline" onClick={() => navigate(ordersListPath)}>Back to orders</Button></div>
 
   const shopName = order.shopName ?? '—'
   const customerName = order.customerName ?? '—'
@@ -179,7 +183,7 @@ export function OrderDetailPage() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Button variant="outline" size="icon" aria-label="Back to orders" onClick={() => navigate('/orders')}><ArrowLeft className="size-4" /></Button>
+          <Button variant="outline" size="icon" aria-label="Back to orders" onClick={() => navigate(ordersListPath)}><ArrowLeft className="size-4" /></Button>
           <div>
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight">{order.trackingCode}</h1><Badge className={order.status === 'DELIVERED' ? 'bg-success text-success-foreground' : order.status === 'AWAITING_APPROVAL' ? 'bg-warning text-warning-foreground' : ''} variant={order.status === 'CANCELLED' ? 'destructive' : 'secondary'}>{order.status.replaceAll('_', ' ')}</Badge>{isDelayed && <Badge variant="destructive">Delayed</Badge>}</div>
             <p className="text-sm text-muted-foreground">Created {new Date(order.createdAt).toLocaleString()}</p>
@@ -268,7 +272,7 @@ export function OrderDetailPage() {
         </TableBody></Table></div> : <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">No field edits have been recorded.</p>}
       </section>
 
-      <Link to="/orders" className="w-fit text-sm underline-offset-4 hover:underline">Back to orders</Link>
+      <Link to={ordersListPath} className="w-fit text-sm underline-offset-4 hover:underline">Back to orders</Link>
 
       {isEditOpen && <OrderFormDialog open={isEditOpen} order={order} pending={actionMutation.isPending} onClose={() => setIsEditOpen(false)} onSave={async (body) => saveAction({ type: 'edit', body: body as UpdateOrderBody })} />}
       <AssignOrderDialog order={activeDialog === 'assign' ? order : null} pending={actionMutation.isPending} onClose={() => setActiveDialog(null)} onSave={async (value) => {
